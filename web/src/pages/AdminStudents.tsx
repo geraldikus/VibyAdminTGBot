@@ -61,6 +61,8 @@ export function AdminStudents() {
     }
   }
 
+  const activeTeachers = teachers.filter((t) => t.active);
+
   return (
     <>
       <div className="header">
@@ -68,67 +70,85 @@ export function AdminStudents() {
         <button className="chip active" onClick={() => setCreating((v) => !v)}>{creating ? 'Close' : 'Add'}</button>
       </div>
       <ErrorBox error={error} />
-      <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="filters">
-        {(['', 'green', 'yellow', 'red', 'blue'] as const).map((s) => (
-          <button key={s || 'all'} className={`chip ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>
-            {s || 'All statuses'}
-          </button>
-        ))}
-      </div>
-      <div className="filters">
-        <button className={`chip ${type === '' ? 'active' : ''}`} onClick={() => setType('')}>All types</button>
-        <button className={`chip ${type === 'subscription' ? 'active' : ''}`} onClick={() => setType('subscription')}>Subscription</button>
-        <button className={`chip ${type === 'business' ? 'active' : ''}`} onClick={() => setType('business')}>Business</button>
-      </div>
-      <select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
-        <option value="">All teachers</option>
-        {teachers.map((t) => <option key={t.teacher_id} value={t.teacher_id}>{t.name}</option>)}
-      </select>
-      <div style={{ height: 10 }} />
-
-      {creating && (
-        <div className="card">
-          <label>Name</label>
-          <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <label>Contact</label>
-          <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
-          <label>Teacher</label>
-          <select value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}>
-            {teachers.filter((t) => t.active).map((t) => <option key={t.teacher_id} value={t.teacher_id}>{t.name}</option>)}
-          </select>
-          <label>Type</label>
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as StudentType })}>
-            <option value="subscription">Subscription</option>
-            <option value="business">Business</option>
-          </select>
-          <label>Status</label>
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Status })}>
-            <option value="green">Green · Paid</option>
-            <option value="yellow">Yellow · Waiting</option>
-            <option value="red">Red · Not paid</option>
-            <option value="blue">Blue · Business</option>
-          </select>
-          <label>Balance</label>
-          <input value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
-          <label>Notes</label>
-          <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          <div style={{ height: 8 }} />
-          <button className="btn" onClick={create}>Create student</button>
+      <div className="page-stack">
+        <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="filters">
+          {(['', 'green', 'yellow', 'red', 'blue'] as const).map((s) => (
+            <button key={s || 'all'} className={`chip ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>
+              {s || 'All statuses'}
+            </button>
+          ))}
         </div>
-      )}
+        <div className="filters">
+          <button className={`chip ${type === '' ? 'active' : ''}`} onClick={() => setType('')}>All types</button>
+          <button className={`chip ${type === 'subscription' ? 'active' : ''}`} onClick={() => setType('subscription')}>Subscription</button>
+          <button className={`chip ${type === 'business' ? 'active' : ''}`} onClick={() => setType('business')}>Business</button>
+        </div>
+        <div className="filters">
+          <button className={`chip ${teacherId === '' ? 'active' : ''}`} onClick={() => setTeacherId('')}>All teachers</button>
+          {teachers.map((t) => (
+            <button
+              key={t.teacher_id}
+              className={`chip ${teacherId === t.teacher_id ? 'active' : ''}`}
+              onClick={() => setTeacherId(t.teacher_id)}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
 
-      {filtered.map((student) => (
-        <div key={student.student_id} className="card clickable" onClick={() => navigate(`/admin/students/${student.student_id}`)}>
-          <div className="row">
-            <div>
-              <div className="title">{student.name}{!student.active ? ' (archived)' : ''}</div>
-              <div className="small">{student.teacher_name} · {student.type === 'business' ? 'Business' : `Balance ${student.balance}`}</div>
+        {creating && (
+          <div className="card form-fields">
+            <label>Name</label>
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <label>Contact</label>
+            <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+            <label>Teacher</label>
+            <div className="filters">
+              {activeTeachers.map((t) => (
+                <button
+                  key={t.teacher_id}
+                  className={`chip ${form.teacher_id === t.teacher_id ? 'active' : ''}`}
+                  onClick={() => setForm({ ...form, teacher_id: t.teacher_id })}
+                >
+                  {t.name}
+                </button>
+              ))}
             </div>
-            <StatusBadge status={student.status} />
+            <label>Type</label>
+            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as StudentType })}>
+              <option value="subscription">Subscription</option>
+              <option value="business">Business</option>
+            </select>
+            <label>Status</label>
+            <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as Status })}>
+              <option value="green">Green · Paid</option>
+              <option value="yellow">Yellow · Waiting</option>
+              <option value="red">Red · Not paid</option>
+              <option value="blue">Blue · Business</option>
+            </select>
+            <label>Balance</label>
+            <input value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+            <label>Notes</label>
+            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <button className="btn" onClick={create}>Create student</button>
           </div>
+        )}
+
+        <div className="list-stack">
+          {filtered.map((student) => (
+            <div key={student.student_id} className="card clickable" onClick={() => navigate(`/admin/students/${student.student_id}`)}>
+              <div className="row">
+                <div>
+                  <div className="title">{student.name}{!student.active ? ' (archived)' : ''}</div>
+                  <div className="small">{student.teacher_name} · {student.type === 'business' ? 'Business' : `Balance ${student.balance}`}</div>
+                </div>
+                <StatusBadge status={student.status} />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </>
   );
 }

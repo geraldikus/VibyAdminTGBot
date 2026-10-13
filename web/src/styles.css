@@ -32,11 +32,16 @@ a { color: var(--link); text-decoration: none; }
 }
 .nav a.active { color: var(--btn); }
 
+.page-stack { display: flex; flex-direction: column; gap: 16px; }
+.page-stack .card { margin-bottom: 0; }
+.list-stack { display: flex; flex-direction: column; gap: 14px; }
+.list-stack .card { margin-bottom: 0; }
+
 .card {
   background: var(--card);
   border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
 }
 .card.clickable { cursor: pointer; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -60,12 +65,17 @@ a { color: var(--link); text-decoration: none; }
 }
 textarea { min-height: 72px; resize: vertical; }
 label { font-size: 13px; color: var(--hint); display: block; margin: 10px 0 6px; }
+.form-fields label { margin: 16px 0 8px; }
+.form-fields label:first-child { margin-top: 0; }
+.form-fields .btn { margin-top: 16px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   border: 0; border-radius: 999px; padding: 8px 12px; background: var(--card); color: var(--text); font-weight: 600;
 }
 .chip.active { background: var(--btn); color: var(--btn-text); }
+.card .chip { background: var(--bg); }
+.card .chip.active { background: var(--btn); color: var(--btn-text); }
 
 .btn {
   border: 0; border-radius: 12px; padding: 12px 14px; width: 100%;
@@ -87,5 +97,5 @@ label { font-size: 13px; color: var(--hint); display: block; margin: 10px 0 6px;
 .title { font-weight: 700; }
 .small { font-size: 12px; color: var(--hint); }
 
-.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .filters .chip { white-space: nowrap; }
