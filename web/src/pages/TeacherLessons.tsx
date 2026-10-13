@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Lesson } from '@school/shared';
 import { api } from '../api';
 import { ErrorBox } from '../ui';
-import { haptic } from '../telegram';
+import { confirmAction, notifyError, notifySuccess } from '../feedback';
 
 type LessonView = Lesson & { edit_seconds_left: number };
 
@@ -34,12 +34,16 @@ export function TeacherLessons() {
   }, []);
 
   async function cancel(id: string) {
+    const ok = await confirmAction('Cancel this lesson? Balance will be restored.');
+    if (!ok) return;
     try {
       await api.post(`/api/teacher/lessons/${id}/cancel`);
-      haptic('success');
+      notifySuccess('Lesson cancelled');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
     }
   }
 
@@ -51,11 +55,13 @@ export function TeacherLessons() {
         lesson_date: date || undefined,
         comment,
       });
-      haptic('success');
+      notifySuccess('Lesson saved');
       setEditing(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
     }
   }
 

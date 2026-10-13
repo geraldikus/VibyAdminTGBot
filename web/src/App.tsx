@@ -12,6 +12,7 @@ import { AdminStudent } from './pages/AdminStudent';
 import { AdminTeachers } from './pages/AdminTeachers';
 import { AdminLessons } from './pages/AdminLessons';
 import { AdminReports } from './pages/AdminReports';
+import { FeedbackHost } from './ui';
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -79,6 +80,7 @@ export function App() {
           </>
         )}
       </Routes>
+      <FeedbackHost />
       <nav className="nav">
         {isAdmin ? (
           <>

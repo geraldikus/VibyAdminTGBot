@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Teacher } from '@school/shared';
 import { api } from '../api';
+import { confirmAction, notifyError, notifySuccess } from '../feedback';
 import { ErrorBox } from '../ui';
 
 export function AdminTeachers() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState('');
 
   async function load() {
     const data = await api.get<{ teachers: Teacher[] }>('/api/admin/teachers');
@@ -29,12 +31,28 @@ export function AdminTeachers() {
   }, [teachers, q]);
 
   async function toggle(teacher: Teacher) {
-    if (!teacher.active) {
-      await api.post(`/api/admin/teachers/${teacher.teacher_id}/approve`);
-    } else {
-      await api.patch(`/api/admin/teachers/${teacher.teacher_id}`, { active: false });
+    if (busyId) return;
+    if (teacher.active) {
+      const ok = await confirmAction(`Deactivate ${teacher.name}?`);
+      if (!ok) return;
     }
-    await load();
+    setBusyId(teacher.teacher_id);
+    try {
+      if (!teacher.active) {
+        await api.post(`/api/admin/teachers/${teacher.teacher_id}/approve`);
+        notifySuccess(`${teacher.name} approved`);
+      } else {
+        await api.patch(`/api/admin/teachers/${teacher.teacher_id}`, { active: false });
+        notifySuccess(`${teacher.name} deactivated`);
+      }
+      await load();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
+    } finally {
+      setBusyId('');
+    }
   }
 
   return (
@@ -54,7 +72,7 @@ export function AdminTeachers() {
                 <span className={`badge ${t.active ? 'green' : 'warn'}`}>{t.active ? 'Active' : 'Pending'}</span>
               </div>
               <div style={{ height: 8 }} />
-              <button className={t.active ? 'btn secondary' : 'btn'} onClick={() => void toggle(t)}>
+              <button className={t.active ? 'btn secondary' : 'btn'} disabled={!!busyId} onClick={() => void toggle(t)}>
                 {t.active ? 'Deactivate' : 'Approve'}
               </button>
             </div>

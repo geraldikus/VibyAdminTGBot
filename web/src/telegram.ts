@@ -7,6 +7,8 @@ type TelegramWebApp = {
   expand: () => void;
   close: () => void;
   HapticFeedback?: { impactOccurred: (style: string) => void; notificationOccurred: (type: string) => void };
+  showAlert?: (message: string, callback?: () => void) => void;
+  showConfirm?: (message: string, callback?: (ok: boolean) => void) => void;
   BackButton: { show: () => void; hide: () => void; onClick: (cb: () => void) => void; offClick: (cb: () => void) => void };
   MainButton: {
     setText: (text: string) => void;

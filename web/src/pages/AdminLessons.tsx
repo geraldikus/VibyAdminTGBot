@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Lesson, Student } from '@school/shared';
 import { api } from '../api';
+import { confirmAction, notifyError, notifySuccess } from '../feedback';
 import { ErrorBox } from '../ui';
 
 type LessonView = Lesson & { edit_seconds_left: number };
@@ -12,6 +13,7 @@ export function AdminLessons() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<LessonView | null>(null);
   const [form, setForm] = useState({ duration_min: '', lesson_date: '', comment: '', student_id: '' });
+  const [busy, setBusy] = useState(false);
 
   async function load() {
     const qs = state ? `?state=${state}` : '';
@@ -28,15 +30,43 @@ export function AdminLessons() {
   }, [state]);
 
   async function save() {
-    if (!editing) return;
-    await api.patch(`/api/admin/lessons/${editing.lesson_id}`, {
-      duration_min: form.duration_min ? Number(form.duration_min) : undefined,
-      lesson_date: form.lesson_date || undefined,
-      comment: form.comment,
-      student_id: form.student_id || undefined,
-    });
-    setEditing(null);
-    await load();
+    if (!editing || busy) return;
+    setBusy(true);
+    try {
+      await api.patch(`/api/admin/lessons/${editing.lesson_id}`, {
+        duration_min: form.duration_min ? Number(form.duration_min) : undefined,
+        lesson_date: form.lesson_date || undefined,
+        comment: form.comment,
+        student_id: form.student_id || undefined,
+      });
+      setEditing(null);
+      await load();
+      notifySuccess('Lesson saved');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelLesson(id: string) {
+    if (busy) return;
+    const ok = await confirmAction('Cancel this lesson? Balance will be restored.');
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/admin/lessons/${id}/cancel`);
+      await load();
+      notifySuccess('Lesson cancelled');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -71,7 +101,7 @@ export function AdminLessons() {
                   student_id: lesson.student_id,
                 });
               }}>Edit</button>
-              <button className="btn danger" onClick={() => api.post(`/api/admin/lessons/${lesson.lesson_id}/cancel`).then(load)}>Cancel</button>
+              <button className="btn danger" disabled={busy} onClick={() => void cancelLesson(lesson.lesson_id)}>Cancel</button>
             </div>
           )}
         </div>
@@ -92,7 +122,7 @@ export function AdminLessons() {
           <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} />
           <div className="btn-row" style={{ marginTop: 8 }}>
             <button className="btn secondary" onClick={() => setEditing(null)}>Close</button>
-            <button className="btn" onClick={() => void save()}>Save</button>
+            <button className="btn" disabled={busy} onClick={() => void save()}>Save</button>
           </div>
         </div>
       )}

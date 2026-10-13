@@ -1,6 +1,6 @@
 import type { Api } from 'grammy';
 import { InlineKeyboard } from 'grammy';
-import type { Lesson, Student } from '@school/shared';
+import type { Lesson, Status, Student } from '@school/shared';
 import { STATUS_EMOJI } from '@school/shared';
 import { config, isAdmin } from '../config.js';
 import { prettyDate } from '../time.js';
@@ -65,15 +65,21 @@ export async function notifyTeacher(telegramId: string, text: string, keyboard?:
   }
 }
 
-export function lessonCaption(lesson: Lesson, extra = ''): string {
+export function lessonCaption(
+  lesson: Lesson,
+  extra = '',
+  opts?: { status?: Status; balanceAfter?: number | string },
+): string {
+  const status = opts?.status ?? lesson.status_at_lesson;
   return [
     extra,
     `Student: ${lesson.student_name}`,
     `Teacher: ${lesson.teacher_name}`,
     `Duration: ${lesson.duration_min} min`,
     `Date: ${prettyDate(lesson.lesson_date)}`,
-    `Status: ${STATUS_EMOJI[lesson.status_at_lesson]} ${lesson.status_at_lesson}`,
+    `Status: ${STATUS_EMOJI[status]} ${status}`,
     `Type: ${lesson.student_type}`,
+    opts?.balanceAfter !== undefined && opts.balanceAfter !== '' ? `Balance after: ${opts.balanceAfter}` : '',
     lesson.comment ? `Comment: ${lesson.comment}` : '',
     `Lesson ID: ${lesson.lesson_id}`,
   ].filter(Boolean).join('\n');

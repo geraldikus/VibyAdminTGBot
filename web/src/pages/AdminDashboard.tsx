@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { notifyError, notifySuccess } from '../feedback';
 import { ErrorBox } from '../ui';
 
 type Dash = {
@@ -45,8 +46,11 @@ export function AdminDashboard() {
         try {
           await api.post('/api/admin/refresh');
           await load();
+          notifySuccess('Sheets refreshed');
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Failed');
+          const message = e instanceof Error ? e.message : 'Failed';
+          setError(message);
+          notifyError(message);
         } finally {
           setBusy(false);
         }

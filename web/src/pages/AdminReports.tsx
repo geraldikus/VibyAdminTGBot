@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { BusinessReportRow } from '@school/shared';
 import { api } from '../api';
+import { notifyError, notifySuccess } from '../feedback';
 import { ErrorBox } from '../ui';
 
 function currentMonth() {
@@ -41,8 +42,11 @@ export function AdminReports() {
         try {
           const data = await api.post<{ reports: BusinessReportRow[] }>('/api/admin/reports/business', { month });
           setReports(data.reports);
+          notifySuccess('Report sent');
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Failed');
+          const message = e instanceof Error ? e.message : 'Failed';
+          setError(message);
+          notifyError(message);
         } finally {
           setBusy(false);
         }

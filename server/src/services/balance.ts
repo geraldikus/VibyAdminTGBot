@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { BalanceReason, Student } from '@school/shared';
+import type { BalanceReason, Status, Student } from '@school/shared';
 import { nowIso } from '../time.js';
 import { repo } from '../sheets/repo.js';
 import { mapStudent } from '../sheets/mappers.js';
 import { writeAudit } from './audit.js';
+
+export function statusAfterBalance(student: Student, balanceAfter: number): Status {
+  if (student.type === 'subscription' && balanceAfter <= 0) return 'red';
+  return student.status;
+}
 
 export async function applyBalanceChange(input: {
   student: Student;
@@ -17,12 +22,15 @@ export async function applyBalanceChange(input: {
   }
   const balanceAfter = input.student.balance + input.change;
   const now = nowIso();
+  const nextStatus = statusAfterBalance(input.student, balanceAfter);
+  const patch: Record<string, unknown> = { balance: balanceAfter, updated_at: now };
+  if (nextStatus !== input.student.status) patch.status = nextStatus;
   await repo.batchAtomic([
     {
       kind: 'update',
       sheet: 'Students',
       id: input.student.student_id,
-      patch: { balance: balanceAfter, updated_at: now },
+      patch,
     },
     {
       kind: 'append',
@@ -40,8 +48,18 @@ export async function applyBalanceChange(input: {
       }],
     },
   ]);
+  if (nextStatus !== input.student.status) {
+    await writeAudit({
+      entity: 'student',
+      entity_id: input.student.student_id,
+      field: 'status',
+      old_value: input.student.status,
+      new_value: nextStatus,
+      by: input.by,
+    });
+  }
   return {
-    student: { ...input.student, balance: balanceAfter, updated_at: now },
+    student: { ...input.student, balance: balanceAfter, status: nextStatus, updated_at: now },
     balanceAfter,
   };
 }

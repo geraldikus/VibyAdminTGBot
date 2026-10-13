@@ -6,7 +6,7 @@ import { repo } from '../sheets/repo.js';
 import { mapLesson, mapStudent } from '../sheets/mappers.js';
 import { getSettings } from './settings.js';
 import { getStudent } from './students.js';
-import { applyBalanceChange } from './balance.js';
+import { applyBalanceChange, statusAfterBalance } from './balance.js';
 import { writeAudit } from './audit.js';
 import {
   channelLink,
@@ -114,8 +114,17 @@ export async function confirmLessonWithPhoto(input: {
   const channelId = getPhotoChannelId();
   if (!channelId) throw httpError('Photo channel is not configured yet', 500);
 
+  const current = await getLesson(input.lesson.lesson_id);
+  if (current.state !== 'pending_photo') return current;
+  const studentBefore = await getStudent(current.student_id);
+  const predictedBalance = studentBefore.type === 'subscription' ? studentBefore.balance - 1 : studentBefore.balance;
+  const predictedStatus = statusAfterBalance(studentBefore, predictedBalance);
+
   const api = getApi();
-  const caption = lessonCaption(input.lesson);
+  const caption = lessonCaption(current, '', {
+    status: predictedStatus,
+    balanceAfter: studentBefore.type === 'subscription' ? predictedBalance : undefined,
+  });
   const sent = input.buffer
     ? await api.sendPhoto(channelId, new InputFile(input.buffer, 'lesson.jpg'), { caption })
     : await api.sendPhoto(channelId, input.fileId, { caption });
@@ -127,19 +136,23 @@ export async function confirmLessonWithPhoto(input: {
   const confirmedAt = nowIso(settings.timezone);
 
   const confirmed = await repo.write(async () => {
-    const current = mapLesson((await repo.findById('Lessons_Log', input.lesson.lesson_id))!);
-    if (current.state !== 'pending_photo') return current;
-    const student = mapStudent((await repo.findById('Students', current.student_id))!);
+    const latest = mapLesson((await repo.findById('Lessons_Log', input.lesson.lesson_id))!);
+    if (latest.state !== 'pending_photo') return latest;
+    const student = mapStudent((await repo.findById('Students', latest.student_id))!);
     let balanceAfter = student.balance;
     const ops: Parameters<typeof repo.batchAtomic>[0] = [];
+    let nextStatus = student.status;
     if (student.type === 'subscription') {
       balanceAfter = student.balance - 1;
+      nextStatus = statusAfterBalance(student, balanceAfter);
       const now = confirmedAt;
+      const patch: Record<string, unknown> = { balance: balanceAfter, updated_at: now };
+      if (nextStatus !== student.status) patch.status = nextStatus;
       ops.push({
         kind: 'update',
         sheet: 'Students',
         id: student.student_id,
-        patch: { balance: balanceAfter, updated_at: now },
+        patch,
       });
       ops.push({
         kind: 'append',
@@ -152,15 +165,15 @@ export async function confirmLessonWithPhoto(input: {
           change: -1,
           balance_after: balanceAfter,
           reason: 'lesson',
-          lesson_id: current.lesson_id,
-          by: current.teacher_name,
+          lesson_id: latest.lesson_id,
+          by: latest.teacher_name,
         }],
       });
     }
     ops.push({
       kind: 'update',
       sheet: 'Lessons_Log',
-      id: current.lesson_id,
+      id: latest.lesson_id,
       patch: {
         state: 'done',
         photo_link: link,
@@ -171,8 +184,18 @@ export async function confirmLessonWithPhoto(input: {
       },
     });
     await repo.batchAtomic(ops);
+    if (nextStatus !== student.status) {
+      await writeAudit({
+        entity: 'student',
+        entity_id: student.student_id,
+        field: 'status',
+        old_value: student.status,
+        new_value: nextStatus,
+        by: latest.teacher_name,
+      });
+    }
     return {
-      ...current,
+      ...latest,
       state: 'done' as const,
       photo_link: link,
       photo_file_id: photoFileId,

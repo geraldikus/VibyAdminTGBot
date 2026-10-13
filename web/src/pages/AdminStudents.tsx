@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Status, Student, StudentType, Teacher } from '@school/shared';
 import { api } from '../api';
+import { notifyError, notifySuccess } from '../feedback';
 import { ErrorBox, StatusBadge } from '../ui';
 
 export function AdminStudents() {
@@ -13,6 +14,7 @@ export function AdminStudents() {
   const [teacherId, setTeacherId] = useState('');
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: '',
     contact: '',
@@ -49,15 +51,22 @@ export function AdminStudents() {
   }), [students, q, status, type, teacherId]);
 
   async function create() {
+    if (busy) return;
+    setBusy(true);
     try {
       const created = await api.post<{ student: Student }>('/api/admin/students', {
         ...form,
         balance: Number(form.balance || 0),
       });
       setCreating(false);
+      notifySuccess('Student created');
       navigate(`/admin/students/${created.student.student_id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      const message = e instanceof Error ? e.message : 'Failed';
+      setError(message);
+      notifyError(message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -131,7 +140,7 @@ export function AdminStudents() {
             <input value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
             <label>Notes</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            <button className="btn" onClick={create}>Create student</button>
+            <button className="btn" disabled={busy} onClick={create}>Create student</button>
           </div>
         )}
 
