@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.env
+credentials.json
+*.log
+.DS_Store
+web/dist
+server/dist
+shared/dist
+.vite
