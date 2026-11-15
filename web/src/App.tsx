@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import type { AppSettings, AuthUser } from '@school/shared';
 import { api } from './api';
-import { tg } from './telegram';
 import { TeacherStudents } from './pages/TeacherStudents';
 import { TeacherStudent } from './pages/TeacherStudent';
 import { TeacherLessons } from './pages/TeacherLessons';
@@ -12,7 +11,22 @@ import { AdminStudent } from './pages/AdminStudent';
 import { AdminTeachers } from './pages/AdminTeachers';
 import { AdminLessons } from './pages/AdminLessons';
 import { AdminReports } from './pages/AdminReports';
-import { FeedbackHost } from './ui';
+import { FeedbackHost, Icon, SkeletonList, useBackButton, type IconName } from './ui';
+
+type Tab = { to: string; label: string; icon: IconName; end?: boolean };
+
+const ADMIN_TABS: Tab[] = [
+  { to: '/admin', label: 'Home', icon: 'home', end: true },
+  { to: '/admin/students', label: 'Students', icon: 'students' },
+  { to: '/admin/lessons', label: 'Lessons', icon: 'lessons' },
+  { to: '/admin/teachers', label: 'Teachers', icon: 'teachers' },
+  { to: '/admin/reports', label: 'Reports', icon: 'reports' },
+];
+
+const TEACHER_TABS: Tab[] = [
+  { to: '/', label: 'Students', icon: 'students', end: true },
+  { to: '/lessons', label: 'Lessons', icon: 'lessons' },
+];
 
 export function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -30,20 +44,9 @@ export function App() {
       .catch((err: Error) => setError(err.message));
   }, []);
 
-  useEffect(() => {
-    const app = tg();
-    if (!app) return;
-    const nested = location.pathname.split('/').filter(Boolean).length > 1
-      || /\/(students|lessons|teachers|reports)\//.test(location.pathname);
-    const onBack = () => navigate(-1);
-    if (nested) {
-      app.BackButton.show();
-      app.BackButton.onClick(onBack);
-    } else {
-      app.BackButton.hide();
-    }
-    return () => app.BackButton.offClick(onBack);
-  }, [location.pathname, navigate]);
+  const nested = location.pathname.split('/').filter(Boolean).length > 1
+    || /\/(students|lessons|teachers|reports)\//.test(location.pathname);
+  useBackButton(() => navigate(-1), nested);
 
   if (error) {
     return (
@@ -53,7 +56,14 @@ export function App() {
       </div>
     );
   }
-  if (!user || !settings) return <div className="app muted">Loading…</div>;
+  if (!user || !settings) {
+    return (
+      <div className="app no-nav">
+        <div className="header"><div className="skeleton" style={{ width: 160, height: 28 }} /></div>
+        <SkeletonList rows={6} />
+      </div>
+    );
+  }
 
   const isAdmin = user.role === 'admin';
 
@@ -82,20 +92,14 @@ export function App() {
       </Routes>
       <FeedbackHost />
       <nav className="nav">
-        {isAdmin ? (
-          <>
-            <NavLink to="/admin" end>Home</NavLink>
-            <NavLink to="/admin/students">Students</NavLink>
-            <NavLink to="/admin/teachers">Teachers</NavLink>
-            <NavLink to="/admin/lessons">Lessons</NavLink>
-            <NavLink to="/admin/reports">Reports</NavLink>
-          </>
-        ) : (
-          <>
-            <NavLink to="/" end>Students</NavLink>
-            <NavLink to="/lessons">Lessons</NavLink>
-          </>
-        )}
+        <div className="nav-inner">
+          {(isAdmin ? ADMIN_TABS : TEACHER_TABS).map((tab) => (
+            <NavLink key={tab.to} to={tab.to} end={tab.end}>
+              <Icon name={tab.icon} size={25} strokeWidth={1.8} />
+              {tab.label}
+            </NavLink>
+          ))}
+        </div>
       </nav>
     </div>
   );

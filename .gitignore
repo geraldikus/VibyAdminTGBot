@@ -9,3 +9,7 @@ web/dist
 server/dist
 shared/dist
 .vite
+data
+*.db
+*.db-wal
+*.db-shm

@@ -4,8 +4,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import { ZodError } from 'zod';
-import { config } from './config.js';
-import { repo } from './sheets/repo.js';
+import { assertProdConfig, config } from './config.js';
+import { db } from './db/index.js';
 import { authMiddleware } from './api/auth.js';
 import { registerMeRoutes } from './api/routes/me.js';
 import { registerTeacherRoutes } from './api/routes/teacher.js';
@@ -15,12 +15,12 @@ import { startScheduler } from './scheduler.js';
 import { loadPhotoChannelId } from './services/notify.js';
 
 async function main() {
-  console.log('Bootstrapping Google Sheets…');
-  await repo.init();
+  assertProdConfig();
+  console.log(`DB ready: ${config.dbPath}`);
   await loadPhotoChannelId();
-  console.log('Sheets ready');
 
-  const app = Fastify({ logger: true });
+  // In production only warnings/errors are logged (request logs are 'info').
+  const app = Fastify({ logger: { level: config.isProd ? 'warn' : 'info' } });
   await app.register(cors, { origin: true });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -64,6 +64,14 @@ async function main() {
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`Server listening on ${config.port}`);
+
+  const shutdown = async () => {
+    await app.close().catch(() => undefined);
+    db.close();
+    process.exit(0);
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }
 
 function requestLog(error: unknown) {

@@ -1,0 +1,34 @@
+# Lives on the server as /opt/school-admin/docker-compose.yml.
+# Only manages this bot. Does NOT touch atomic-english-bot or caddy.
+name: school-admin
+
+services:
+  school-admin:
+    image: school-admin-bot:latest
+    container_name: school-admin-bot
+    restart: unless-stopped
+    env_file: /opt/school-admin/.env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_PATH: /app/data/school.db
+      BACKUP_DIR: /app/data/backups
+      NODE_OPTIONS: --max-old-space-size=192
+    volumes:
+      - /opt/school-admin/data:/app/data
+      # Optional, only for the Google Sheets mirror / one-time import:
+      # - /opt/school-admin/credentials.json:/app/credentials.json:ro
+    # No "ports:" on purpose: reachable only inside the viby network, via Caddy.
+    networks:
+      - viby
+    mem_limit: 256m
+    memswap_limit: 384m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  viby:
+    external: true

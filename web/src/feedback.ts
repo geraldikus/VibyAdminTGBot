@@ -1,4 +1,4 @@
-import { haptic, tg } from './telegram';
+import { haptic, inTelegram, tg } from './telegram';
 
 type ToastFn = (message: string) => void;
 type ConfirmFn = (message: string) => Promise<boolean>;
@@ -15,20 +15,17 @@ export function registerFeedback(next: { toast: ToastFn; confirm: ConfirmFn }) {
   };
 }
 
+/** Success: haptic + a short toast that does not block the screen. */
 export function notifySuccess(message: string) {
   haptic('success');
-  const app = tg();
-  if (app?.showAlert) {
-    app.showAlert(message);
-    return;
-  }
   toastFn?.(message);
 }
 
+/** Errors need attention: native alert inside Telegram, toast elsewhere. */
 export function notifyError(message: string) {
   haptic('error');
   const app = tg();
-  if (app?.showAlert) {
+  if (inTelegram() && app?.showAlert) {
     app.showAlert(message);
     return;
   }
@@ -37,7 +34,7 @@ export function notifyError(message: string) {
 
 export function confirmAction(message: string): Promise<boolean> {
   const app = tg();
-  if (app?.showConfirm) {
+  if (inTelegram() && app?.showConfirm) {
     return new Promise((resolve) => {
       app.showConfirm!(message, (ok) => resolve(Boolean(ok)));
     });

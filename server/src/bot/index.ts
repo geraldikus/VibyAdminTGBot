@@ -1,8 +1,17 @@
+import { createHash } from 'node:crypto';
 import { Bot, InlineKeyboard, webhookCallback } from 'grammy';
 import type { FastifyInstance } from 'fastify';
 import { config, isAdmin } from '../config.js';
 import { approveTeacher, findTeacherByTelegramId, upsertPendingTeacher } from '../services/teachers.js';
-import { setBotApi, setPhotoChannelId, notifyAdmins, notifyTeacher } from '../services/notify.js';
+import {
+  getPhotoChannelId,
+  notifyAdmins,
+  notifyTeacher,
+  photoChannelFromEnv,
+  setBotApi,
+  setPhotoChannelId,
+} from '../services/notify.js';
+import { EDITABLE_SETTINGS, getSettings, writeSetting } from '../services/settings.js';
 import { handleIncomingPhoto, handlePhotoChoice, setAwaitingPhotoReplace } from './photo.js';
 
 export function createBot() {
@@ -58,22 +67,64 @@ export function createBot() {
     await ctx.reply(`Your Telegram ID: ${ctx.from?.id}\nChat ID: ${ctx.chat.id}`);
   });
 
+  // The photo channel is never switched automatically: the bot only reports the chat ID,
+  // an admin has to confirm it with /setchannel.
   bot.on('my_chat_member', async (ctx) => {
     const chat = ctx.chat;
     const status = ctx.myChatMember.new_chat_member.status;
     if ((chat.type === 'channel' || chat.type === 'supergroup') && (status === 'administrator' || status === 'member')) {
-      const id = String(chat.id);
-      setPhotoChannelId(id);
       await notifyAdmins(
-        `Bot was added to ${chat.title ?? 'a chat'}.\nSet PHOTO_CHANNEL_ID=${id} in the environment (already used until restart).`,
+        `Bot was added to ${chat.title ?? 'a chat'} (ID ${chat.id}).\n`
+          + `To use it for lesson photos send: /setchannel ${chat.id}`,
       );
     }
   });
 
-  bot.on('channel_post', async (ctx) => {
-    if (ctx.chat.type === 'channel') {
-      setPhotoChannelId(String(ctx.chat.id));
+  bot.command('setchannel', async (ctx) => {
+    if (!ctx.from || !isAdmin(ctx.from.id) || ctx.chat.type !== 'private') return;
+    const id = ctx.match.trim();
+    if (!/^-100\d{5,}$/.test(id)) {
+      await ctx.reply(`Usage: /setchannel -100XXXXXXXXXX\nCurrent: ${getPhotoChannelId() || 'not set'}`);
+      return;
     }
+    if (photoChannelFromEnv()) {
+      await ctx.reply('PHOTO_CHANNEL_ID is set in .env and takes priority. Change it there and restart.');
+      return;
+    }
+    try {
+      const me = await ctx.api.getChatMember(id, ctx.me.id);
+      if (me.status !== 'administrator') {
+        await ctx.reply('The bot must be an administrator of that channel.');
+        return;
+      }
+    } catch {
+      await ctx.reply('The bot has no access to that chat.');
+      return;
+    }
+    await setPhotoChannelId(id);
+    await ctx.reply(`Lesson photos will be posted to ${id}.`);
+  });
+
+  bot.command('settings', async (ctx) => {
+    if (!ctx.from || !isAdmin(ctx.from.id) || ctx.chat.type !== 'private') return;
+    const settings = await getSettings();
+    const lines = Object.entries(settings).map(([k, v]) => `${k} = ${v}`);
+    await ctx.reply(
+      `${lines.join('\n')}\nphoto_channel_id = ${getPhotoChannelId() || '-'}\n\n`
+        + `Change: /set <key> <value>\nKeys: ${Object.keys(EDITABLE_SETTINGS).join(', ')}`,
+    );
+  });
+
+  bot.command('set', async (ctx) => {
+    if (!ctx.from || !isAdmin(ctx.from.id) || ctx.chat.type !== 'private') return;
+    const [key, value] = ctx.match.trim().split(/\s+/, 2);
+    const validate = key ? EDITABLE_SETTINGS[key] : undefined;
+    if (!validate || value === undefined || !validate(value)) {
+      await ctx.reply(`Usage: /set <key> <value>\nKeys: ${Object.keys(EDITABLE_SETTINGS).join(', ')}`);
+      return;
+    }
+    await writeSetting(key, value);
+    await ctx.reply(`${key} = ${value}`);
   });
 
   bot.callbackQuery(/^approve:(.+)$/, async (ctx) => {
@@ -115,6 +166,19 @@ export async function startBot(app: FastifyInstance, bot: ReturnType<typeof crea
     { command: 'start', description: 'Open the school app' },
     { command: 'id', description: 'Show your Telegram ID' },
   ]);
+  for (const adminId of config.adminIds) {
+    try {
+      await bot.api.setMyCommands([
+        { command: 'start', description: 'Open the school app' },
+        { command: 'settings', description: 'Show settings' },
+        { command: 'set', description: 'Change a setting' },
+        { command: 'setchannel', description: 'Set the lesson photo channel' },
+        { command: 'id', description: 'Show your Telegram ID' },
+      ], { scope: { type: 'chat', chat_id: Number(adminId) } });
+    } catch (error) {
+      console.warn('Could not set admin commands for', adminId);
+    }
+  }
 
   try {
     await bot.api.setChatMenuButton({
@@ -125,10 +189,15 @@ export async function startBot(app: FastifyInstance, bot: ReturnType<typeof crea
   }
 
   if (config.isProd && config.publicUrl) {
-    const path = `/telegram/${config.webhookSecret}`;
-    app.post(path, webhookCallback(bot, 'fastify'));
-    await bot.api.setWebhook(`${config.publicUrl}${path}`);
-    console.log(`Webhook set to ${config.publicUrl}${path}`);
+    // Telegram sends the secret in the X-Telegram-Bot-Api-Secret-Token header;
+    // grammY rejects requests without it (401). The path itself is not secret.
+    const path = `/telegram/${createHash('sha256').update(config.webhookSecret).digest('hex').slice(0, 16)}`;
+    app.post(path, webhookCallback(bot, 'fastify', { secretToken: config.webhookSecret }));
+    await bot.api.setWebhook(`${config.publicUrl}${path}`, {
+      secret_token: config.webhookSecret,
+      allowed_updates: ['message', 'callback_query', 'my_chat_member'],
+    });
+    console.log('Webhook set');
     return;
   }
 

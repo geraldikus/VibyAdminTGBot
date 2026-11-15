@@ -1,4 +1,4 @@
-import { createHmac, createHash } from 'node:crypto';
+import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthUser } from '@school/shared';
 import { config, isAdmin } from '../config.js';
@@ -23,7 +23,9 @@ export function validateInitData(initData: string): {
 
   const secret = createHmac('sha256', 'WebAppData').update(config.botToken).digest();
   const computed = createHmac('sha256', secret).update(entries).digest('hex');
-  if (computed !== hash) {
+  const a = Buffer.from(computed, 'hex');
+  const b = Buffer.from(hash, 'hex');
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     throw Object.assign(new Error('Invalid initData'), { statusCode: 401 });
   }
 

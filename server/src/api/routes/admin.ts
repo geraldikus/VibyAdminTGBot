@@ -8,11 +8,12 @@ import {
   updateTeacherSchema,
 } from '@school/shared';
 import { requireRole } from '../auth.js';
-import { repo } from '../../sheets/repo.js';
+import { mirrorEnabled, mirrorToSheets } from '../../services/sheetsMirror.js';
+import { sendExcelBackup } from '../../services/export.js';
 import { getDashboard, generateBusinessReport, listBusinessReports } from '../../services/reports.js';
 import { createStudent, getStudentHistory, listStudents, updateStudent } from '../../services/students.js';
 import { approveTeacher, listTeachers, updateTeacher } from '../../services/teachers.js';
-import { cancelLesson, editLesson, listLessons, remainingEditSeconds } from '../../services/lessons.js';
+import { cancelLesson, editLesson, listLessonsPage, remainingEditSeconds } from '../../services/lessons.js';
 import { topUpBalance } from '../../services/balance.js';
 import { getSettings } from '../../services/settings.js';
 
@@ -21,16 +22,27 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
   app.get('/api/admin/dashboard', admin, async () => ({ dashboard: await getDashboard() }));
 
+  // Pushes the DB to the read-only Google Sheets mirror right now.
   app.post('/api/admin/refresh', admin, async () => {
-    await repo.refresh();
-    return { ok: true };
+    if (!mirrorEnabled()) return { ok: false, mirror: 'disabled' };
+    const result = await mirrorToSheets();
+    return { ok: true, mirror: result ?? 'already running' };
+  });
+
+  // Whole DB as .xlsx, delivered to the admin's chat (file downloads inside Mini Apps are unreliable).
+  app.post('/api/admin/export', admin, async (request) => {
+    const result = await sendExcelBackup(request.authUser.telegramId);
+    return { ok: true, ...result };
   });
 
   app.get('/api/admin/students', admin, async (request) => {
     const query = request.query as { teacher_id?: string; status?: string; type?: string };
-    let students = await listStudents({ teacherId: query.teacher_id, activeOnly: false });
-    if (query.status) students = students.filter((s) => s.status === query.status);
-    if (query.type) students = students.filter((s) => s.type === query.type);
+    const students = await listStudents({
+      teacherId: query.teacher_id,
+      activeOnly: false,
+      status: query.status,
+      type: query.type,
+    });
     return { students };
   });
 
@@ -75,10 +87,25 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/admin/lessons', admin, async (request) => {
-    const query = request.query as { teacher_id?: string; student_id?: string; state?: string };
+    const query = request.query as {
+      teacher_id?: string;
+      student_id?: string;
+      state?: string;
+      month?: string;
+      before?: string;
+      limit?: string;
+    };
     const settings = await getSettings();
-    const lessons = await listLessons(query);
+    const { lessons, next_cursor } = listLessonsPage({
+      teacherId: query.teacher_id,
+      studentId: query.student_id,
+      state: query.state,
+      month: query.month,
+      before: query.before,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
     return {
+      next_cursor,
       lessons: lessons.map((lesson) => ({
         ...lesson,
         edit_seconds_left: remainingEditSeconds(lesson, settings.edit_window_min),

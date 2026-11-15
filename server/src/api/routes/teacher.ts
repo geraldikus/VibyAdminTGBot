@@ -5,7 +5,7 @@ import {
   createLesson,
   editLesson,
   cancelLesson,
-  listLessons,
+  listLessonsPage,
   remainingEditSeconds,
 } from '../../services/lessons.js';
 import { getSettings } from '../../services/settings.js';
@@ -35,8 +35,10 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
   app.get('/api/teacher/lessons', { preHandler: requireRole('teacher', 'admin') }, async (request) => {
     const settings = await getSettings();
     const teacherId = request.authUser.role === 'teacher' ? request.authUser.teacherId : undefined;
-    const lessons = await listLessons({ teacherId });
+    const query = request.query as { month?: string; before?: string };
+    const { lessons, next_cursor } = listLessonsPage({ teacherId, month: query.month, before: query.before });
     return {
+      next_cursor,
       lessons: lessons.map((lesson) => ({
         ...lesson,
         edit_seconds_left: remainingEditSeconds(lesson, settings.edit_window_min),

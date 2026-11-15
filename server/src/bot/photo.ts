@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { Context } from 'grammy';
 import { InlineKeyboard } from 'grammy';
 import {
@@ -8,18 +9,18 @@ import {
 import { findTeacherByTelegramId } from '../services/teachers.js';
 import { isAdmin } from '../config.js';
 import { prettyDate } from '../time.js';
+import { putState, takeState } from '../services/botState.js';
 
-const awaitingReplace = new Map<string, string>();
-const pendingFiles = new Map<string, string>();
-
+/** Photo waiting for "which lesson?" choice. Stored in DB, expires in 10 minutes. */
 function rememberFile(fileId: string): string {
-  const token = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-  pendingFiles.set(token, fileId);
+  const token = randomBytes(6).toString('base64url');
+  putState(`photo:${token}`, fileId);
   return token;
 }
 
+/** "Replace photo" mode: only the next photo within 10 minutes goes to the lesson. */
 export function setAwaitingPhotoReplace(telegramId: string, lessonId: string) {
-  awaitingReplace.set(String(telegramId), lessonId);
+  putState(`replace:${telegramId}`, lessonId);
 }
 
 export async function handleIncomingPhoto(ctx: Context) {
@@ -32,9 +33,8 @@ export async function handleIncomingPhoto(ctx: Context) {
   }
   if (ctx.message?.document && !isImageDoc) return;
 
-  const replaceId = awaitingReplace.get(String(from.id));
+  const replaceId = takeState(`replace:${from.id}`);
   if (replaceId) {
-    awaitingReplace.delete(String(from.id));
     const teacher = await findTeacherByTelegramId(String(from.id));
     const user = isAdmin(from.id)
       ? {
@@ -56,8 +56,12 @@ export async function handleIncomingPhoto(ctx: Context) {
       await ctx.reply('Access denied.');
       return;
     }
-    const lesson = await replaceLessonPhoto(replaceId, fileId, user);
-    await ctx.reply(`Photo updated for ${lesson.student_name}.`);
+    try {
+      const lesson = await replaceLessonPhoto(replaceId, fileId, user);
+      await ctx.reply(`Photo updated for ${lesson.student_name}.`);
+    } catch (error) {
+      await ctx.reply(`Could not replace the photo: ${error instanceof Error ? error.message : 'error'}`);
+    }
     return;
   }
 
@@ -75,14 +79,19 @@ export async function handleIncomingPhoto(ctx: Context) {
   }
 
   if (pending.length === 1) {
-    const lesson = await confirmLessonWithPhoto({ lesson: pending[0], fileId });
-    await ctx.reply(`Lesson saved: ${lesson.student_name}, ${lesson.duration_min} min, ${prettyDate(lesson.lesson_date)}.`);
+    try {
+      const lesson = await confirmLessonWithPhoto({ lesson: pending[0], fileId });
+      await ctx.reply(`Lesson saved: ${lesson.student_name}, ${lesson.duration_min} min, ${prettyDate(lesson.lesson_date)}.`);
+    } catch (error) {
+      console.error('Photo confirm failed', error);
+      await ctx.reply('Could not save the lesson, please send the photo again.');
+    }
     return;
   }
 
   const keyboard = new InlineKeyboard();
+  const token = rememberFile(fileId);
   for (const lesson of pending.slice(0, 10)) {
-    const token = rememberFile(fileId);
     keyboard
       .text(
         `${lesson.student_name} · ${lesson.duration_min}m · ${prettyDate(lesson.lesson_date)}`,
@@ -94,8 +103,7 @@ export async function handleIncomingPhoto(ctx: Context) {
 }
 
 export async function handlePhotoChoice(ctx: Context, lessonId: string, token: string) {
-  const fileId = pendingFiles.get(token);
-  pendingFiles.delete(token);
+  const fileId = takeState(`photo:${token}`);
   if (!fileId) {
     await ctx.answerCallbackQuery({ text: 'Photo expired, send it again' });
     return;
@@ -108,7 +116,14 @@ export async function handlePhotoChoice(ctx: Context, lessonId: string, token: s
     await ctx.answerCallbackQuery({ text: 'Lesson is no longer waiting for a photo' });
     return;
   }
-  const confirmed = await confirmLessonWithPhoto({ lesson, fileId });
+  let confirmed;
+  try {
+    confirmed = await confirmLessonWithPhoto({ lesson, fileId });
+  } catch (error) {
+    console.error('Photo confirm failed', error);
+    await ctx.answerCallbackQuery({ text: 'Could not save, send the photo again', show_alert: true });
+    return;
+  }
   await ctx.answerCallbackQuery({ text: 'Saved' });
   await ctx.editMessageText(`Lesson saved: ${confirmed.student_name}, ${confirmed.duration_min} min.`);
 }

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Student } from '@school/shared';
+import { STATUS_LABEL } from '@school/shared';
 import { api } from '../api';
-import { StatusBadge, ErrorBox } from '../ui';
+import {
+  Avatar, BalancePill, Cell, EmptyState, ErrorBox, PageHeader, SearchInput, Section, SkeletonList, StatusDot, urgency,
+} from '../ui';
 
 export function TeacherStudents() {
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<Student[] | null>(null);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -17,28 +20,38 @@ export function TeacherStudents() {
   }, []);
 
   const filtered = useMemo(
-    () => students.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())),
+    () => (students ?? [])
+      .filter((s) => s.name.toLowerCase().includes(q.trim().toLowerCase()))
+      .sort((a, b) => urgency(a) - urgency(b) || a.name.localeCompare(b.name)),
     [students, q],
   );
 
   return (
     <>
-      <div className="header"><h1>My students</h1></div>
+      <PageHeader title="My students" />
       <ErrorBox error={error} />
-      <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div style={{ height: 10 }} />
-      {filtered.map((student) => (
-        <div key={student.student_id} className="card clickable" onClick={() => navigate(`/students/${student.student_id}`)}>
-          <div className="row">
-            <div>
-              <div className="title">{student.name}</div>
-              <div className="small">{student.type === 'business' ? 'Business' : `Balance: ${student.balance}`}</div>
-            </div>
-            <StatusBadge status={student.status} />
-          </div>
-        </div>
-      ))}
-      {!filtered.length && <p className="muted">No students yet.</p>}
+      {students && students.length > 5 && <SearchInput value={q} onChange={setQ} />}
+      {!students && !error && <SkeletonList />}
+      {students && !!filtered.length && (
+        <Section title={`${filtered.length} ${filtered.length === 1 ? 'student' : 'students'}`} footer="Tap a student to mark a lesson.">
+          {filtered.map((s) => (
+            <Cell
+              key={s.student_id}
+              before={<Avatar name={s.name} seed={s.student_id} />}
+              title={s.name}
+              subtitle={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><StatusDot status={s.status} />{STATUS_LABEL[s.status]}</span>}
+              after={<BalancePill student={s} />}
+              chevron
+              onClick={() => navigate(`/students/${s.student_id}`)}
+            />
+          ))}
+        </Section>
+      )}
+      {students && !filtered.length && (
+        q
+          ? <EmptyState emoji="🔍" title="Nothing found" text={`No students match “${q}”.`} />
+          : <EmptyState emoji="🎓" title="No students yet" text="The admin will assign students to you." />
+      )}
     </>
   );
 }

@@ -1,7 +1,8 @@
 import { nowIso } from '../time.js';
-import { repo } from '../sheets/repo.js';
+import { insertAudit } from '../db/rows.js';
 
-export async function writeAudit(entry: {
+/** Synchronous so it can run inside a transaction. */
+export function writeAudit(entry: {
   entity: string;
   entity_id: string;
   field: string;
@@ -9,5 +10,5 @@ export async function writeAudit(entry: {
   new_value: string;
   by: string;
 }) {
-  await repo.appendRows('Audit_Log', [{ created_at: nowIso(), ...entry }]);
+  insertAudit({ created_at: nowIso(), ...entry });
 }

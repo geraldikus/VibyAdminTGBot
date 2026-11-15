@@ -1,44 +1,72 @@
 import { useEffect, useState } from 'react';
-import type { Lesson, Student } from '@school/shared';
+import { useSearchParams } from 'react-router-dom';
+import type { Student } from '@school/shared';
 import { api } from '../api';
 import { confirmAction, notifyError, notifySuccess } from '../feedback';
-import { ErrorBox } from '../ui';
+import { Cell, EmptyState, ErrorBox, MonthPicker, PageHeader, Section, Segmented, SkeletonList, currentMonth } from '../ui';
+import {
+  LessonEditSheet, LessonStateIcon, PendingBanner, groupByDay, type LessonEditValues, type LessonView,
+} from '../lessonUi';
 
-type LessonView = Lesson & { edit_seconds_left: number };
+type StateFilter = '' | 'pending_photo' | 'done' | 'cancelled';
 
 export function AdminLessons() {
-  const [lessons, setLessons] = useState<LessonView[]>([]);
+  const [params, setParams] = useSearchParams();
+  const state = (params.get('state') ?? '') as StateFilter;
+  const [lessons, setLessons] = useState<LessonView[] | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
-  const [state, setState] = useState('');
+  // Pending lessons are shown across all months, others default to the current month.
+  const [month, setMonth] = useState(state === 'pending_photo' ? '' : currentMonth());
+  const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<LessonView | null>(null);
-  const [form, setForm] = useState({ duration_min: '', lesson_date: '', comment: '', student_id: '' });
   const [busy, setBusy] = useState(false);
 
+  function setState(next: StateFilter) {
+    const p = new URLSearchParams(params);
+    if (next) p.set('state', next); else p.delete('state');
+    setParams(p, { replace: true });
+  }
+
+  function lessonsUrl(before?: string) {
+    const qs = new URLSearchParams();
+    if (state) qs.set('state', state);
+    if (month) qs.set('month', month);
+    if (before) qs.set('before', before);
+    return `/api/admin/lessons?${qs}`;
+  }
+
   async function load() {
-    const qs = state ? `?state=${state}` : '';
     const [l, s] = await Promise.all([
-      api.get<{ lessons: LessonView[] }>(`/api/admin/lessons${qs}`),
+      api.get<{ lessons: LessonView[]; next_cursor: string | null }>(lessonsUrl()),
       api.get<{ students: Student[] }>('/api/admin/students'),
     ]);
     setLessons(l.lessons);
+    setCursor(l.next_cursor);
     setStudents(s.students);
   }
 
-  useEffect(() => {
-    load().catch((e: Error) => setError(e.message));
-  }, [state]);
+  async function loadMore() {
+    if (!cursor) return;
+    try {
+      const l = await api.get<{ lessons: LessonView[]; next_cursor: string | null }>(lessonsUrl(cursor));
+      setLessons((prev) => [...(prev ?? []), ...l.lessons]);
+      setCursor(l.next_cursor);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed');
+    }
+  }
 
-  async function save() {
+  useEffect(() => {
+    setLessons(null);
+    load().catch((e: Error) => setError(e.message));
+  }, [state, month]);
+
+  async function save(values: LessonEditValues) {
     if (!editing || busy) return;
     setBusy(true);
     try {
-      await api.patch(`/api/admin/lessons/${editing.lesson_id}`, {
-        duration_min: form.duration_min ? Number(form.duration_min) : undefined,
-        lesson_date: form.lesson_date || undefined,
-        comment: form.comment,
-        student_id: form.student_id || undefined,
-      });
+      await api.patch(`/api/admin/lessons/${editing.lesson_id}`, values);
       setEditing(null);
       await load();
       notifySuccess('Lesson saved');
@@ -51,13 +79,14 @@ export function AdminLessons() {
     }
   }
 
-  async function cancelLesson(id: string) {
+  async function cancelLesson(lesson: LessonView) {
     if (busy) return;
-    const ok = await confirmAction('Cancel this lesson? Balance will be restored.');
+    const ok = await confirmAction('Cancel this lesson? The balance will be restored.');
     if (!ok) return;
     setBusy(true);
     try {
-      await api.post(`/api/admin/lessons/${id}/cancel`);
+      await api.post(`/api/admin/lessons/${lesson.lesson_id}/cancel`);
+      setEditing(null);
       await load();
       notifySuccess('Lesson cancelled');
     } catch (e) {
@@ -69,63 +98,49 @@ export function AdminLessons() {
     }
   }
 
+  const pending = state === 'pending_photo' ? 0 : (lessons ?? []).filter((l) => l.state === 'pending_photo').length;
+
   return (
     <>
-      <div className="header"><h1>Lessons</h1></div>
+      <PageHeader title="Lessons" />
       <ErrorBox error={error} />
-      <div className="filters">
-        {['', 'pending_photo', 'done', 'cancelled'].map((s) => (
-          <button key={s || 'all'} className={`chip ${state === s ? 'active' : ''}`} onClick={() => setState(s)}>
-            {s || 'All'}
-          </button>
-        ))}
-      </div>
-      {lessons.map((lesson) => (
-        <div key={lesson.lesson_id} className="card">
-          <div className="row">
-            <div>
-              <div className="title">{lesson.student_name}</div>
-              <div className="small">{lesson.teacher_name} · {lesson.lesson_date} · {lesson.duration_min} min</div>
-            </div>
-            <span className="badge">{lesson.state}</span>
-          </div>
-          {lesson.photo_link && <a href={lesson.photo_link} target="_blank" rel="noreferrer">Open photo</a>}
-          {lesson.state !== 'cancelled' && (
-            <div className="btn-row" style={{ marginTop: 8 }}>
-              <button className="btn secondary" onClick={() => {
-                setEditing(lesson);
-                setForm({
-                  duration_min: String(lesson.duration_min),
-                  lesson_date: lesson.lesson_date,
-                  comment: lesson.comment,
-                  student_id: lesson.student_id,
-                });
-              }}>Edit</button>
-              <button className="btn danger" disabled={busy} onClick={() => void cancelLesson(lesson.lesson_id)}>Cancel</button>
-            </div>
-          )}
-        </div>
+      <Segmented<StateFilter>
+        value={state}
+        options={[['', 'All'], ['pending_photo', 'No photo'], ['done', 'Done'], ['cancelled', 'Cancelled']]}
+        onChange={setState}
+      />
+      <MonthPicker month={month} onChange={setMonth} />
+      <PendingBanner count={pending} />
+      {!lessons && !error && <SkeletonList rows={5} />}
+      {lessons && groupByDay(lessons).map(([day, items]) => (
+        <Section key={day} title={day} after={`${items.length}`}>
+          {items.map((l) => (
+            <Cell
+              key={l.lesson_id}
+              before={<LessonStateIcon state={l.state} />}
+              title={l.student_name}
+              subtitle={[l.teacher_name, `${l.duration_min} min`, l.comment].filter(Boolean).join(' · ')}
+              after={l.photo_link
+                ? <a href={l.photo_link} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Photo</a>
+                : undefined}
+              dimmed={l.state === 'cancelled'}
+              chevron={l.state !== 'cancelled'}
+              onClick={l.state !== 'cancelled' ? () => setEditing(l) : undefined}
+            />
+          ))}
+        </Section>
       ))}
+      {cursor && <button className="btn plain" onClick={() => void loadMore()}>Load more</button>}
+      {lessons && !lessons.length && <EmptyState emoji="📅" title="No lessons" text="Nothing for this filter." />}
 
-      {editing && (
-        <div className="card">
-          <h2>Edit lesson</h2>
-          <label>Student</label>
-          <select value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}>
-            {students.map((s) => <option key={s.student_id} value={s.student_id}>{s.name}</option>)}
-          </select>
-          <label>Duration</label>
-          <input value={form.duration_min} onChange={(e) => setForm({ ...form, duration_min: e.target.value })} />
-          <label>Date</label>
-          <input type="date" value={form.lesson_date} onChange={(e) => setForm({ ...form, lesson_date: e.target.value })} />
-          <label>Comment</label>
-          <textarea value={form.comment} onChange={(e) => setForm({ ...form, comment: e.target.value })} />
-          <div className="btn-row" style={{ marginTop: 8 }}>
-            <button className="btn secondary" onClick={() => setEditing(null)}>Close</button>
-            <button className="btn" disabled={busy} onClick={() => void save()}>Save</button>
-          </div>
-        </div>
-      )}
+      <LessonEditSheet
+        lesson={editing}
+        students={students.filter((s) => s.active || s.student_id === editing?.student_id)}
+        busy={busy}
+        onClose={() => setEditing(null)}
+        onSave={(v) => void save(v)}
+        onCancelLesson={() => editing && void cancelLesson(editing)}
+      />
     </>
   );
 }

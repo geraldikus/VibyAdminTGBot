@@ -4,17 +4,16 @@ import type { Lesson, Status, Student } from '@school/shared';
 import { STATUS_EMOJI } from '@school/shared';
 import { config, isAdmin } from '../config.js';
 import { prettyDate } from '../time.js';
-import { writeSetting } from './settings.js';
-import { repo } from '../sheets/repo.js';
+import { getRawSetting, writeSetting } from './settings.js';
 
 let api: Api | null = null;
 let photoChannelId = config.photoChannelId;
 
+/** PHOTO_CHANNEL_ID from env wins; otherwise the value an admin set with /setchannel. */
 export async function loadPhotoChannelId() {
   if (photoChannelId) return photoChannelId;
-  const rows = await repo.getAll('Settings');
-  const fromSheet = rows.find((r) => r.key === 'photo_channel_id')?.value;
-  if (fromSheet) photoChannelId = fromSheet;
+  const stored = getRawSetting('photo_channel_id');
+  if (stored) photoChannelId = stored;
   return photoChannelId;
 }
 
@@ -22,15 +21,22 @@ export function setBotApi(next: Api) {
   api = next;
 }
 
-export function setPhotoChannelId(id: string) {
+/** Only called from the admin-only /setchannel command. */
+export async function setPhotoChannelId(id: string) {
   photoChannelId = id;
-  void writeSetting('photo_channel_id', id).catch((error) => {
-    console.error('Failed to persist PHOTO_CHANNEL_ID', error);
-  });
+  await writeSetting('photo_channel_id', id);
+}
+
+export function photoChannelFromEnv(): boolean {
+  return Boolean(config.photoChannelId);
 }
 
 export function getPhotoChannelId(): string {
   return photoChannelId;
+}
+
+export function getApiOrNull(): Api | null {
+  return api;
 }
 
 export function getApi(): Api {
