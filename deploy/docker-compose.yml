@@ -7,6 +7,8 @@ services:
     image: school-admin-bot:latest
     container_name: school-admin-bot
     restart: unless-stopped
+    # tini as PID 1: forwards SIGTERM to node for a clean DB shutdown.
+    init: true
     env_file: /opt/school-admin/.env
     environment:
       NODE_ENV: production

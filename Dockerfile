@@ -31,16 +31,15 @@ ENV NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=192
 WORKDIR /app
 COPY --from=prod-deps /app/node_modules node_modules
-COPY package.json tsconfig.base.json ./
+COPY package.json ./
 COPY shared/package.json shared/
-COPY shared/src shared/src
-COPY server/package.json server/tsconfig.json server/
-COPY server/src server/src
+COPY server/package.json server/
+# Server compiled to plain JS at build time (server/build.mjs): no tsx/esbuild at runtime.
+COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/web/dist web/dist
 RUN mkdir -p /app/data && chown -R node:node /app/data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-# tsx directly (no npm wrapper process) to save memory.
-CMD ["node_modules/.bin/tsx", "server/src/index.ts"]
+CMD ["node", "--enable-source-maps", "server/dist/index.js"]

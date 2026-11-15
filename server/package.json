@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noEmit",
-    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit && node build.mjs",
+    "start": "node --enable-source-maps dist/index.js",
     "migrate:sheets": "tsx src/migrate-from-sheets.ts",
     "backup": "tsx src/backup-cli.ts",
     "mirror": "tsx src/mirror-cli.ts"
@@ -21,13 +21,14 @@
     "googleapis": "^148.0.0",
     "grammy": "^1.35.0",
     "node-cron": "^3.0.3",
-    "tsx": "^4.19.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.13.10",
     "@types/node-cron": "^3.0.11",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
 }

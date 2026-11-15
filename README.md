@@ -31,7 +31,10 @@ npm run dev               # API + Vite, бот в режиме long polling
 (остаётся на сервере, хранится `BACKUP_KEEP_DAYS` дней, по умолчанию 14).
 **1-го числа каждого месяца** бэкап ещё и присылается в `BACKUP_TELEGRAM_CHAT_ID`: Excel-файл для просмотра
 и `.db.gz` для восстановления. В любой момент Excel можно получить кнопкой «Download backup» на дашборде.
-Вручную на сервере: `npm run backup -w server`.
+Вручную на сервере:
+```bash
+docker exec school-admin-bot node server/dist/backup-cli.js
+```
 
 Восстановление: остановить контейнер, `gunzip -c school-….db.gz > data/school.db`, удалить
 `school.db-wal`/`school.db-shm`, запустить.
@@ -122,6 +125,9 @@ deploy/deploy.sh
 и удаляет старые образы `school-admin-bot` (другие образы не трогает).
 
 ### Ресурсы
+
+Сервер компилируется в JS при сборке образа (`server/build.mjs`, esbuild), в контейнере работает только `node`.
+Локально `npm run dev` по-прежнему запускает TypeScript через `tsx`.
 
 Контейнер ограничен 256 MB RAM (`mem_limit`), Node — 192 MB heap, логи Docker — 3 файла по 10 MB.
 База растёт примерно на 5–10 MB в год, удалять историю не нужно.
