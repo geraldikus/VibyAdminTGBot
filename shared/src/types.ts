@@ -153,6 +153,11 @@ export const createStudentSchema = z.object({
   notes: z.string().max(1000).optional().default(''),
 });
 
+/** Teacher adds a student for themself: teacher_id comes from the session, balance is capped. */
+export const teacherCreateStudentSchema = createStudentSchema.omit({ teacher_id: true }).extend({
+  balance: z.number().int().min(0).max(200).optional().default(0),
+});
+
 export const updateStudentSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   contact: z.string().max(200).optional(),
@@ -180,6 +185,7 @@ export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 export type EditLessonInput = z.infer<typeof editLessonSchema>;
 export type CreateStudentInput = z.infer<typeof createStudentSchema>;
 export type UpdateStudentInput = z.infer<typeof updateStudentSchema>;
+export type TeacherCreateStudentInput = z.infer<typeof teacherCreateStudentSchema>;
 
 export const STATUS_LABEL: Record<Status, string> = {
   green: 'Paid',

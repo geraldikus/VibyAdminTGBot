@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { createLessonSchema, editLessonSchema } from '@school/shared';
-import { listStudents, getStudent } from '../../services/students.js';
+import { STATUS_LABEL, createLessonSchema, editLessonSchema, teacherCreateStudentSchema } from '@school/shared';
+import { createStudent, listStudents, getStudent } from '../../services/students.js';
+import { notifyAdmins } from '../../services/notify.js';
 import {
   createLesson,
   editLesson,
@@ -21,6 +22,26 @@ export async function registerTeacherRoutes(app: FastifyInstance) {
       activeOnly: true,
     });
     return { students };
+  });
+
+  // Teacher adds a student for themself. No approval: admins are notified.
+  app.post('/api/teacher/students', { preHandler: requireRole('teacher') }, async (request) => {
+    const input = teacherCreateStudentSchema.parse(request.body);
+    const user = request.authUser;
+    const student = await createStudent({ ...input, teacher_id: user.teacherId! }, user.name);
+    const lines = [
+      `Teacher ${user.name} added a student`,
+      [
+        student.name,
+        student.type === 'business' ? 'Business' : 'Subscription',
+        STATUS_LABEL[student.status],
+        student.type === 'subscription' ? `balance ${student.balance}` : '',
+      ].filter(Boolean).join(' · '),
+      student.contact ? `Contact: ${student.contact}` : '',
+      student.type === 'subscription' && student.balance > 0 ? 'Check the payment: balance was set by the teacher' : '',
+    ];
+    await notifyAdmins(lines.filter(Boolean).join('\n'), { studentId: student.student_id });
+    return { student };
   });
 
   app.get('/api/teacher/students/:id', { preHandler: requireRole('teacher', 'admin') }, async (request) => {

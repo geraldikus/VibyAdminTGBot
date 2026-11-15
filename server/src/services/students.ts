@@ -69,6 +69,7 @@ export async function createStudent(input: CreateStudentInput, by: string): Prom
          VALUES (?, ?, ?, ?, ?, ?, 'top_up', '', ?)`,
       ).run(randomUUID(), now, student.student_id, student.name, student.balance, student.balance, by);
     }
+    writeAudit({ entity: 'student', entity_id: student.student_id, field: 'created', old_value: '', new_value: student.name, by });
     return student;
   });
 }
