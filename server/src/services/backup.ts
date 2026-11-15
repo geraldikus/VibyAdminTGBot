@@ -7,13 +7,15 @@ import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { todayYmd } from '../time.js';
 import { getApiOrNull } from './notify.js';
+import { buildExcelBackup } from './export.js';
 
 /**
- * Online SQLite backup (safe while the bot is running), gzipped, kept for
- * BACKUP_KEEP_DAYS days. If BACKUP_TELEGRAM_CHAT_ID is set, the file is also
- * sent there so a copy lives outside the server.
+ * Online SQLite backup (safe while the bot is running), gzipped, kept on the
+ * server for BACKUP_KEEP_DAYS days. With `sendToTelegram` (the scheduler does
+ * this on the 1st of each month) the .db.gz and an Excel copy are also sent to
+ * BACKUP_TELEGRAM_CHAT_ID, so a copy lives outside the server.
  */
-export async function runBackup(): Promise<string> {
+export async function runBackup(opts: { sendToTelegram?: boolean } = {}): Promise<string> {
   fs.mkdirSync(config.backupDir, { recursive: true });
   const stamp = todayYmd();
   const raw = path.join(config.backupDir, `school-${stamp}.db`);
@@ -31,9 +33,15 @@ export async function runBackup(): Promise<string> {
 
   const chatId = process.env.BACKUP_TELEGRAM_CHAT_ID?.trim();
   const api = getApiOrNull();
-  if (chatId && api) {
+  if (opts.sendToTelegram && chatId && api) {
     try {
-      await api.sendDocument(chatId, new InputFile(gz), { caption: `DB backup ${stamp}` });
+      const excel = await buildExcelBackup();
+      await api.sendDocument(chatId, new InputFile(excel.buffer, excel.filename), {
+        caption: `Monthly backup ${stamp} · Excel (${excel.rows} rows)`,
+      });
+      await api.sendDocument(chatId, new InputFile(gz), {
+        caption: `Monthly backup ${stamp} · database file for restore`,
+      });
     } catch (error) {
       console.error('Failed to send backup to Telegram', error);
     }

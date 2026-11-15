@@ -27,9 +27,11 @@ npm run dev               # API + Vite, бот в режиме long polling
 
 ## Бэкапы
 
-Каждую ночь в 03:30 по Москве делается онлайн-копия базы в `data/backups/school-YYYY-MM-DD.db.gz`,
-хранится `BACKUP_KEEP_DAYS` дней (по умолчанию 14). Если задан `BACKUP_TELEGRAM_CHAT_ID`, файл ещё и присылается
-в этот чат: так копия есть и вне сервера. Вручную: `npm run backup -w server`.
+Каждую ночь в 03:30 по Москве делается онлайн-копия базы в `data/backups/school-YYYY-MM-DD.db.gz`
+(остаётся на сервере, хранится `BACKUP_KEEP_DAYS` дней, по умолчанию 14).
+**1-го числа каждого месяца** бэкап ещё и присылается в `BACKUP_TELEGRAM_CHAT_ID`: Excel-файл для просмотра
+и `.db.gz` для восстановления. В любой момент Excel можно получить кнопкой «Download backup» на дашборде.
+Вручную на сервере: `npm run backup -w server`.
 
 Восстановление: остановить контейнер, `gunzip -c school-….db.gz > data/school.db`, удалить
 `school.db-wal`/`school.db-shm`, запустить.

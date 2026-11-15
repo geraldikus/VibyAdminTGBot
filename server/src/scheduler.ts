@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { config } from './config.js';
+import { todayYmd } from './time.js';
 import { optimize } from './db/index.js';
 import { processPhotoReminders } from './services/lessons.js';
 import { catchUpBusinessReport, dailyBusinessReportJob } from './services/reports.js';
@@ -22,11 +23,13 @@ export function startScheduler() {
 
   cron.schedule('0 9 * * *', job('Business report', dailyBusinessReportJob), { timezone: 'Europe/Moscow' });
 
-  // Nightly: SQLite backup, stale bot state cleanup, query planner stats.
+  // Nightly: SQLite backup kept on the server, stale bot state cleanup, planner stats.
+  // On the 1st of the month the backup is also sent to BACKUP_TELEGRAM_CHAT_ID.
   cron.schedule('30 3 * * *', job('Nightly maintenance', async () => {
     cleanupState();
     optimize();
-    await runBackup();
+    const firstOfMonth = todayYmd().endsWith('-01');
+    await runBackup({ sendToTelegram: firstOfMonth });
   }), { timezone: 'Europe/Moscow' });
 
   if (mirrorEnabled()) {
