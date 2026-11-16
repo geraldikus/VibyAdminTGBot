@@ -161,6 +161,16 @@ export function createBot() {
   return bot;
 }
 
+/**
+ * Telegram sends the secret in the X-Telegram-Bot-Api-Secret-Token header;
+ * grammY rejects requests without it (401). The path itself is not secret.
+ */
+export function registerWebhookRoute(app: FastifyInstance, bot: Bot, secret: string): string {
+  const path = `/telegram/${createHash('sha256').update(secret).digest('hex').slice(0, 16)}`;
+  app.post(path, webhookCallback(bot, 'fastify', { secretToken: secret }));
+  return path;
+}
+
 export async function startBot(app: FastifyInstance, bot: ReturnType<typeof createBot>) {
   await bot.api.setMyCommands([
     { command: 'start', description: 'Open the school app' },
@@ -189,10 +199,7 @@ export async function startBot(app: FastifyInstance, bot: ReturnType<typeof crea
   }
 
   if (config.isProd && config.publicUrl) {
-    // Telegram sends the secret in the X-Telegram-Bot-Api-Secret-Token header;
-    // grammY rejects requests without it (401). The path itself is not secret.
-    const path = `/telegram/${createHash('sha256').update(config.webhookSecret).digest('hex').slice(0, 16)}`;
-    app.post(path, webhookCallback(bot, 'fastify', { secretToken: config.webhookSecret }));
+    const path = registerWebhookRoute(app, bot, config.webhookSecret);
     await bot.api.setWebhook(`${config.publicUrl}${path}`, {
       secret_token: config.webhookSecret,
       allowed_updates: ['message', 'callback_query', 'my_chat_member'],

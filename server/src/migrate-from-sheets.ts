@@ -10,6 +10,7 @@
 import { config } from './config.js';
 import { db } from './db/index.js';
 import { getSheets, withRetry } from './sheets/client.js';
+import { normDate as normDateRaw, normDateTime as normDateTimeRaw } from './sheets/dates.js';
 import { COLUMNS, type SheetName } from './sheets/schema.js';
 import {
   mapAudit,
@@ -27,39 +28,8 @@ const FORCE = args.has('--force');
 const warnings: string[] = [];
 const warn = (msg: string) => warnings.push(msg);
 
-// ---------- date normalisation (independent of the sheet's locale) ----------
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function fromSerial(serial: number, withTime: boolean): string {
-  const ms = Math.round((serial - 25569) * 86_400_000); // 25569 = 1970-01-01 in Sheets serials
-  const d = new Date(ms);
-  const ymd = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
-  return withTime ? `${ymd} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}` : ymd;
-}
-
-function normDate(raw: unknown, ctx: string): string {
-  if (raw === '' || raw == null) return '';
-  if (typeof raw === 'number') return fromSerial(raw, false);
-  const s = String(raw).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
-  warn(`${ctx}: unrecognised date "${s}" kept as is`);
-  return s;
-}
-
-function normDateTime(raw: unknown, ctx: string): string {
-  if (raw === '' || raw == null) return '';
-  if (typeof raw === 'number') return fromSerial(raw, true);
-  const s = String(raw).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]} ${pad(+m[4])}:${m[5]}:${m[6] ?? '00'}`;
-  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])} ${pad(+m[4])}:${m[5]}:${m[6] ?? '00'}`;
-  warn(`${ctx}: unrecognised datetime "${s}" kept as is`);
-  return s;
-}
+const normDate = (raw: unknown, ctx: string) => normDateRaw(raw, ctx, warn);
+const normDateTime = (raw: unknown, ctx: string) => normDateTimeRaw(raw, ctx, warn);
 
 // ---------- read sheets ----------
 type RawRow = Record<string, unknown>;
