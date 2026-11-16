@@ -206,5 +206,7 @@ const counts = db.prepare(`SELECT
   (SELECT COUNT(*) FROM balance_log) AS balance_log`).get();
 console.log(`Demo database ready: ${dbPath}`);
 console.table(counts);
-console.log('Run `npm run demo` and open http://localhost:5173 (admin). Teacher view: localStorage.devUser = "teacher:1001:<teacher_id>"');
+console.log('Run `npm run demo` and open http://localhost:5173 (you are the admin).');
+console.log('Teacher view, paste into the browser console:');
+for (const t of teacherRows) console.log(`  localStorage.devUser = "teacher:${t.telegram_id}:${t.teacher_id}"   // ${t.name}`);
 process.exit(0);
