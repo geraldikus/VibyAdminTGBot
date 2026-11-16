@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Build locally, ship the image to the server, restart ONLY school-admin-bot.
-# Usage: deploy/deploy.sh            (DEPLOY_HOST=root@209.250.251.138 by default)
+# Usage: DEPLOY_HOST=root@<server-ip> deploy/deploy.sh
+#    or: put DEPLOY_HOST=root@<server-ip> into deploy/local.env (not committed).
 set -euo pipefail
 
-HOST="${DEPLOY_HOST:-root@209.250.251.138}"
+LOCAL_ENV="$(dirname "$0")/local.env"
+# shellcheck disable=SC1090
+[ -z "${DEPLOY_HOST:-}" ] && [ -f "$LOCAL_ENV" ] && . "$LOCAL_ENV"
+HOST="${DEPLOY_HOST:?Set DEPLOY_HOST (e.g. root@203.0.113.10) or create deploy/local.env}"
 IMAGE=school-admin-bot
 REMOTE_DIR=/opt/school-admin
 cd "$(dirname "$0")/.."

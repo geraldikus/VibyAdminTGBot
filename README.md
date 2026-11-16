@@ -59,15 +59,15 @@ docker exec school-admin-bot node server/dist/backup-cli.js
 |---|---|
 | Каталог | `/opt/school-admin` (`.env`, `docker-compose.yml`, `data/`) |
 | Контейнер | `school-admin-bot`, образ `school-admin-bot:latest`, сеть `viby`, порт 3000 только внутри сети |
-| Домен | `admin-viby-school.duckdns.org` → `209.250.251.138` |
+| Домен | `admin.example.com` → `<server-ip>` |
 
 ### Первый запуск
 
-1. **DNS.** В DuckDNS поставить `admin-viby-school` → `209.250.251.138`. Проверить:
+1. **DNS.** Направить A-запись домена `admin.example.com` на `<server-ip>`. Проверить:
    ```bash
-   dig +short admin-viby-school.duckdns.org
+   dig +short admin.example.com
    ```
-   Должно быть `209.250.251.138`. Пока это не так, Caddy не трогать.
+   Должно быть `<server-ip>`. Пока это не так, Caddy не трогать.
 2. **Swap 2 GB** (рекомендуется, 1 GB RAM на двух ботов):
    ```bash
    fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
@@ -79,8 +79,8 @@ docker exec school-admin-bot node server/dist/backup-cli.js
    mkdir -p /opt/school-admin/data && chown -R 1000:1000 /opt/school-admin/data
    nano /opt/school-admin/.env && chmod 600 /opt/school-admin/.env
    ```
-   Минимум: `BOT_TOKEN`, `ADMIN_IDS`, `PHOTO_CHANNEL_ID`, `WEBAPP_URL=https://admin-viby-school.duckdns.org`,
-   `PUBLIC_URL=https://admin-viby-school.duckdns.org`, `WEBHOOK_SECRET=$(openssl rand -hex 32)`, `BACKUP_TELEGRAM_CHAT_ID`.
+   Минимум: `BOT_TOKEN`, `ADMIN_IDS`, `PHOTO_CHANNEL_ID`, `WEBAPP_URL=https://admin.example.com`,
+   `PUBLIC_URL=https://admin.example.com`, `WEBHOOK_SECRET=$(openssl rand -hex 32)`, `BACKUP_TELEGRAM_CHAT_ID`.
 4. **Перенос данных.** Остановить сервис на Render (иначе он вернёт свой вебхук и продолжит писать в таблицу).
    Локально:
    ```bash
@@ -88,12 +88,16 @@ docker exec school-admin-bot node server/dist/backup-cli.js
    ```
    Отправить базу на сервер:
    ```bash
-   scp data/school.db root@209.250.251.138:/opt/school-admin/data/
+   scp data/school.db root@<server-ip>:/opt/school-admin/data/
    ```
    ```bash
-   ssh root@209.250.251.138 'chown 1000:1000 /opt/school-admin/data/school.db'
+   ssh root@<server-ip> 'chown 1000:1000 /opt/school-admin/data/school.db'
    ```
-5. **Образ и запуск** (собирается на Mac, сервер ничего не компилирует):
+5. **Образ и запуск** (собирается на Mac, сервер ничего не компилирует). Адрес сервера один раз положить
+   в `deploy/local.env` (файл не коммитится):
+   ```bash
+   echo 'DEPLOY_HOST=root@<server-ip>' > deploy/local.env
+   ```
    ```bash
    deploy/deploy.sh
    ```
@@ -108,12 +112,12 @@ docker exec school-admin-bot node server/dist/backup-cli.js
    ```bash
    docker exec <caddy-container> caddy reload --config /etc/caddy/Caddyfile
    ```
-   Проверить оба сайта: `https://vibyschool.duckdns.org` и `https://admin-viby-school.duckdns.org/health`.
+   Проверить оба сайта: `https://<existing-site>` и `https://admin.example.com/health`.
 7. Перезапустить бота, чтобы он поставил вебхук уже на рабочий HTTPS:
    ```bash
-   ssh root@209.250.251.138 'docker restart school-admin-bot'
+   ssh root@<server-ip> 'docker restart school-admin-bot'
    ```
-   В BotFather обновить URL Mini App на `https://admin-viby-school.duckdns.org`.
+   В BotFather обновить URL Mini App на `https://admin.example.com`.
 
 ### Обновления
 

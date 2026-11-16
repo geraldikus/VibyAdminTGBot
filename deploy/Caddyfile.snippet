@@ -1,7 +1,7 @@
-# APPEND this block to /opt/caddy/Caddyfile. Do not change the existing
-# vibyschool.duckdns.org block.
+# APPEND this block to the Caddyfile of the existing Caddy container.
+# Do not change the blocks that are already there.
 
-admin-viby-school.duckdns.org {
+admin.example.com {
 	encode gzip
 	reverse_proxy school-admin-bot:3000
 }

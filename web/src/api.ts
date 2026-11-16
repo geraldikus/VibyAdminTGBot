@@ -8,7 +8,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const initData = getInitData();
   if (initData) headers.set('X-Telegram-Init-Data', initData);
   if (!initData && import.meta.env.DEV) {
-    const dev = localStorage.getItem('devUser') || 'admin:298752342';
+    const dev = localStorage.getItem('devUser') || 'admin:1';
     headers.set('X-Dev-User', dev);
   }
   const res = await fetch(`${base}${path}`, { ...init, headers });
