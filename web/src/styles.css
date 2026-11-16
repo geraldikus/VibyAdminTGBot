@@ -163,7 +163,7 @@ label { font-size: 13px; color: var(--hint); display: block; margin: 14px 0 6px;
   position: sticky; top: 0; z-index: 5; padding: 6px 0 12px;
   background: var(--bg);
 }
-.search-wrap input { padding-left: 36px; background-color: var(--fill-strong); }
+.search-wrap input { padding-left: 36px; background-color: var(--section); }
 .search-wrap .search-icon { position: absolute; left: 11px; top: 17px; color: var(--hint); display: flex; }
 
 /* ---------- Chips / segmented ---------- */

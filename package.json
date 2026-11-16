@@ -11,7 +11,9 @@
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
     "migrate:sheets": "npm run migrate:sheets -w server",
-    "test": "npm test -w server"
+    "test": "npm test -w server",
+    "seed:demo": "npm run seed:demo -w server --",
+    "demo": "DB_PATH=./data/demo.db BOT_TOKEN= ADMIN_IDS=1 SHEETS_MIRROR=0 concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

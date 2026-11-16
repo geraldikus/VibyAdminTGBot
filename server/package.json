@@ -9,7 +9,8 @@
     "migrate:sheets": "tsx src/migrate-from-sheets.ts",
     "backup": "tsx src/backup-cli.ts",
     "mirror": "tsx src/mirror-cli.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:demo": "tsx src/seed-demo.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",
