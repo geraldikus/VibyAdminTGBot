@@ -5,6 +5,7 @@ import { optimize } from './db/index.js';
 import { processPhotoReminders } from './services/lessons.js';
 import { catchUpBusinessReport, dailyBusinessReportJob } from './services/reports.js';
 import { cleanupState } from './services/botState.js';
+import { processPaymentReminders } from './services/payments.js';
 import { runBackup } from './services/backup.js';
 import { mirrorEnabled, mirrorToSheets } from './services/sheetsMirror.js';
 
@@ -22,6 +23,9 @@ export function startScheduler() {
   cron.schedule('* * * * *', job('Photo reminder', processPhotoReminders));
 
   cron.schedule('0 9 * * *', job('Business report', dailyBusinessReportJob), { timezone: 'Europe/Moscow' });
+
+  // "Check the payment" for students waiting longer than payment_reminder_days.
+  cron.schedule('0 10 * * *', job('Payment reminder', processPaymentReminders), { timezone: 'Europe/Moscow' });
 
   // Nightly: SQLite backup kept on the server, stale bot state cleanup, planner stats.
   // On the 1st of the month the backup is also sent to BACKUP_TELEGRAM_CHAT_ID.

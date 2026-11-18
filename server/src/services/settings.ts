@@ -1,5 +1,8 @@
-import type { AppSettings } from '@school/shared';
-import { readSettings, readSettingsMap, setSetting } from '../db/rows.js';
+import type { AppSettings, UpdateSettingsInput } from '@school/shared';
+import { EDITABLE_SETTING_LIMITS, updateSettingsSchema } from '@school/shared';
+import { tx } from '../db/index.js';
+import { insertAudit, readSettings, readSettingsMap, setSetting } from '../db/rows.js';
+import { nowIso } from '../time.js';
 
 export async function getSettings(): Promise<AppSettings> {
   return readSettings();
@@ -17,10 +20,31 @@ export async function writeSetting(key: string, value: string | number) {
   setSetting(key, value);
 }
 
-/** Settings an admin may change from the bot with /set. */
-export const EDITABLE_SETTINGS: Record<string, (v: string) => boolean> = {
-  backdate_days: (v) => /^\d{1,3}$/.test(v),
-  edit_window_min: (v) => /^\d{1,5}$/.test(v),
-  photo_reminder_min: (v) => /^\d{1,4}$/.test(v) && Number(v) >= 1,
-  photo_admin_alert_min: (v) => /^\d{1,5}$/.test(v) && Number(v) >= 1,
-};
+export const EDITABLE_SETTING_KEYS = Object.keys(EDITABLE_SETTING_LIMITS) as Array<keyof UpdateSettingsInput>;
+
+/**
+ * Changes admin-editable settings (Mini App and /set share this path and its validation).
+ * Throws a ZodError on invalid input. Each changed value is written to the audit log.
+ */
+export function updateSettings(input: unknown, by: string): AppSettings {
+  const changes = updateSettingsSchema.parse(input);
+  return tx(() => {
+    const current = readSettings();
+    const now = nowIso();
+    for (const key of EDITABLE_SETTING_KEYS) {
+      const next = changes[key];
+      if (next === undefined || next === current[key]) continue;
+      setSetting(key, next);
+      insertAudit({
+        created_at: now,
+        entity: 'settings',
+        entity_id: key,
+        field: key,
+        old_value: String(current[key]),
+        new_value: String(next),
+        by,
+      });
+    }
+    return readSettings();
+  });
+}

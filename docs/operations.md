@@ -54,8 +54,26 @@ npm test        # Vitest suite (server/test)
 - `/id` — show your Telegram ID and the chat ID.
 - Admins only, in a private chat with the bot:
   - `/settings` — current settings.
-  - `/set <key> <value>` — change `backdate_days`, `edit_window_min`, `photo_reminder_min`, `photo_admin_alert_min`.
+  - `/set <key> <value>` — change `backdate_days`, `edit_window_min`, `photo_reminder_min`, `photo_admin_alert_min`, `payment_reminder_days`.
   - `/setchannel -100…` — set the lesson photo channel (the bot must be an admin there). The bot never switches the channel by itself.
+
+The same settings can be changed in the Mini App: **Dashboard → Settings**. Every change is written to the audit log.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `backdate_days` | 7 | How many days in the past a teacher can mark a lesson |
+| `edit_window_min` | 5 | How long a teacher can edit or cancel a marked lesson |
+| `photo_reminder_min` | 10 | Remind the teacher if the lesson photo has not arrived |
+| `photo_admin_alert_min` | 60 | Alert the admin if the photo is still missing |
+| `payment_reminder_days` | 2 | "Check payment" reminder for students in *Waiting for payment*; `0` turns it off |
+
+## Payment reminders
+
+When a student's status becomes *Waiting for payment*, the database records the date (a trigger on the status column,
+so every way of changing the status is covered). Every day at 10:00 (Europe/Moscow) admins get one message listing the
+students who have been waiting for `payment_reminder_days` calendar days or more. The reminder repeats with the same
+interval while the status stays the same. Changing the status (e.g. to *Paid*) clears the date and stops the reminders;
+moving back to *Waiting for payment* starts the count again. Archived students are skipped.
 
 ## Backups
 

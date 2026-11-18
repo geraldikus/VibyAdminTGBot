@@ -5,7 +5,7 @@ import { STATUS_LABEL } from '@school/shared';
 import { api } from '../api';
 import { confirmAction, notifyError, notifySuccess } from '../feedback';
 import {
-  Avatar, BalancePill, BottomSheet, Cell, Chip, ErrorBox, IconTile, Section, Segmented, SkeletonList, StatusBadge, dayLabel,
+  Avatar, BalancePill, BottomSheet, Cell, Chip, ErrorBox, IconTile, Section, Segmented, SkeletonList, StatusBadge, dayLabel, todayYmd,
 } from '../ui';
 import { LessonStateIcon, lessonStateLabel } from '../lessonUi';
 
@@ -117,7 +117,12 @@ export function AdminStudent() {
         </Section>
       )}
 
-      <Section title="Status">
+      <Section
+        title="Status"
+        footer={student.status === 'yellow' && student.payment_wait_since
+          ? `Waiting for payment since ${waitingSince(student.payment_wait_since)}.`
+          : undefined}
+      >
         <div style={{ padding: '10px 12px 0' }}>
           <Segmented<Status>
             value={student.status}
@@ -207,4 +212,12 @@ export function AdminStudent() {
       </BottomSheet>
     </>
   );
+}
+
+function waitingSince(dateTime: string): string {
+  const ymd = dateTime.slice(0, 10);
+  const days = Math.round((Date.parse(todayYmd()) - Date.parse(ymd)) / 86_400_000);
+  const date = new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  if (days <= 0) return `${date} (today)`;
+  return `${date} (${days} ${days === 1 ? 'day' : 'days'})`;
 }

@@ -123,6 +123,30 @@ const MIGRATIONS: string[] = [
     expires_at INTEGER NOT NULL
   );
   `,
+  // v2: "check the payment" reminders. The wait start is kept by triggers, so every way of
+  // changing a status (Mini App, teacher-created student, import, manual SQL) is covered.
+  // Times are Moscow local like the rest of the DB (UTC+3, no DST).
+  `
+  ALTER TABLE students ADD COLUMN payment_wait_since TEXT NOT NULL DEFAULT '';
+  ALTER TABLE students ADD COLUMN payment_reminded_at TEXT NOT NULL DEFAULT '';
+
+  UPDATE students SET payment_wait_since = datetime('now', '+3 hours') WHERE status = 'yellow';
+
+  CREATE TRIGGER students_payment_wait_insert AFTER INSERT ON students
+  WHEN NEW.status = 'yellow' AND NEW.payment_wait_since = ''
+  BEGIN
+    UPDATE students SET payment_wait_since = datetime('now', '+3 hours') WHERE student_id = NEW.student_id;
+  END;
+
+  CREATE TRIGGER students_payment_wait_update AFTER UPDATE OF status ON students
+  WHEN NEW.status IS NOT OLD.status
+  BEGIN
+    UPDATE students
+    SET payment_wait_since = CASE WHEN NEW.status = 'yellow' THEN datetime('now', '+3 hours') ELSE '' END,
+        payment_reminded_at = ''
+    WHERE student_id = NEW.student_id;
+  END;
+  `,
 ];
 
 function migrate() {

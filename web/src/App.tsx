@@ -11,6 +11,7 @@ import { AdminStudent } from './pages/AdminStudent';
 import { AdminTeachers } from './pages/AdminTeachers';
 import { AdminLessons } from './pages/AdminLessons';
 import { AdminReports } from './pages/AdminReports';
+import { AdminSettings } from './pages/AdminSettings';
 import { FeedbackHost, Icon, SkeletonList, useBackButton, type IconName } from './ui';
 
 type Tab = { to: string; label: string; icon: IconName; end?: boolean };
@@ -79,6 +80,7 @@ export function App() {
             <Route path="/admin/teachers" element={<AdminTeachers />} />
             <Route path="/admin/lessons" element={<AdminLessons />} />
             <Route path="/admin/reports" element={<AdminReports />} />
+            <Route path="/admin/settings" element={<AdminSettings onSaved={setSettings} />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </>
         ) : (

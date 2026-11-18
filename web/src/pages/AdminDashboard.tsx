@@ -118,6 +118,15 @@ export function AdminDashboard() {
           chevron
         />
       </Section>
+
+      <Section footer="Reminders, edit window, how far back lessons can be marked.">
+        <Cell
+          before={<IconTile name="settings" color="#8e8e93" />}
+          title="Settings"
+          onClick={() => navigate('/admin/settings')}
+          chevron
+        />
+      </Section>
     </>
   );
 }

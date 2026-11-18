@@ -196,6 +196,11 @@ tx(() => {
   }
 });
 
+// Students waiting for payment: one for a while (gets the "check payment" reminder), one since yesterday.
+const backdateWait = db.prepare('UPDATE students SET payment_wait_since = ? WHERE student_id = ?');
+backdateWait.run(formatDateTime(daysAgo(4, 14, 20)), students[2].row.student_id);
+backdateWait.run(formatDateTime(daysAgo(1, 18, 5)), students[6].row.student_id);
+
 setSetting('photo_channel_id', '-1001234567890');
 await generateBusinessReport(previousMonth(), 'auto');
 

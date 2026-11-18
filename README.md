@@ -59,9 +59,11 @@ a small database on top of Sheets.
 - Student cards: status, top-ups, full lesson and balance history.
 - Lessons by day with a month filter and pagination; edit, move or cancel with a bottom sheet.
 - Approve teachers, monthly business-client report, one-tap Excel backup to the chat.
+- Settings screen: reminder timings, edit window, how far back lessons can be marked.
 
 **Automation**
 - Photo reminders to the teacher and an alert to the admin if the photo never arrives.
+- "Check payment" reminder when a student has been waiting for payment for N days (configurable), repeated until the status changes.
 - Status turns red when a package runs out and back to green after a top-up.
 - Business report on the 1st of the month, rebuilt later if teachers mark last month's lessons late.
 - Nightly database backup on the server; monthly Excel + database copy delivered to Telegram.
@@ -133,12 +135,13 @@ regardless of the sheet locale and checking that every balance equals the sum of
 npm test
 ```
 
-39 [Vitest](https://vitest.dev) tests in [`server/test`](server/test), each file on its own temporary database with a fake Telegram API:
+54 [Vitest](https://vitest.dev) tests in [`server/test`](server/test), each file on its own temporary database with a fake Telegram API:
 
 - the same `client_id` twice → one lesson;
 - two simultaneous photo confirmations → one charge, duplicate post deleted;
 - repeated cancellation → one refund; moving a lesson → balances shift once;
 - overlapping reminder runs → one message;
+- payment reminder: due after N calendar days, repeats every N days, stops when the status changes, off at 0;
 - business report rebuilt → no duplicates, late lessons counted in their month;
 - Telegram `initData` signature (valid, tampered, expired), role checks, webhook secret.
 

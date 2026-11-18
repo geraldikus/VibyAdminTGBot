@@ -70,6 +70,7 @@ export function readSettings(): AppSettings {
     edit_window_min: numOr('edit_window_min', DEFAULT_SETTINGS.edit_window_min),
     photo_reminder_min: numOr('photo_reminder_min', DEFAULT_SETTINGS.photo_reminder_min),
     photo_admin_alert_min: numOr('photo_admin_alert_min', DEFAULT_SETTINGS.photo_admin_alert_min),
+    payment_reminder_days: numOr('payment_reminder_days', DEFAULT_SETTINGS.payment_reminder_days),
     timezone: map.get('timezone') || DEFAULT_SETTINGS.timezone,
     last_business_report: map.get('last_business_report') ?? DEFAULT_SETTINGS.last_business_report,
   };

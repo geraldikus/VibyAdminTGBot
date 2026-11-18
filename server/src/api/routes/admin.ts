@@ -15,7 +15,8 @@ import { createStudent, getStudentHistory, listStudents, updateStudent } from '.
 import { approveTeacher, listTeachers, updateTeacher } from '../../services/teachers.js';
 import { cancelLesson, editLesson, listLessonsPage, remainingEditSeconds } from '../../services/lessons.js';
 import { topUpBalance } from '../../services/balance.js';
-import { getSettings } from '../../services/settings.js';
+import { getSettings, updateSettings } from '../../services/settings.js';
+import { getPhotoChannelId } from '../../services/notify.js';
 
 export async function registerAdminRoutes(app: FastifyInstance) {
   const admin = { preHandler: requireRole('admin') };
@@ -34,6 +35,15 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const result = await sendExcelBackup(request.authUser.telegramId);
     return { ok: true, ...result };
   });
+
+  app.get('/api/admin/settings', admin, async () => ({
+    settings: await getSettings(),
+    photo_channel_id: getPhotoChannelId(),
+  }));
+
+  app.patch('/api/admin/settings', admin, async (request) => ({
+    settings: updateSettings(request.body, request.authUser.name),
+  }));
 
   app.get('/api/admin/students', admin, async (request) => {
     const query = request.query as { teacher_id?: string; status?: string; type?: string };

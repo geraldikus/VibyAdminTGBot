@@ -11,7 +11,8 @@ import {
   setBotApi,
   setPhotoChannelId,
 } from '../services/notify.js';
-import { EDITABLE_SETTINGS, getSettings, writeSetting } from '../services/settings.js';
+import { EDITABLE_SETTING_KEYS, getSettings, updateSettings } from '../services/settings.js';
+import { EDITABLE_SETTING_LIMITS, type EditableSettingKey } from '@school/shared';
 import { handleIncomingPhoto, handlePhotoChoice, setAwaitingPhotoReplace } from './photo.js';
 
 export function createBot() {
@@ -111,20 +112,26 @@ export function createBot() {
     const lines = Object.entries(settings).map(([k, v]) => `${k} = ${v}`);
     await ctx.reply(
       `${lines.join('\n')}\nphoto_channel_id = ${getPhotoChannelId() || '-'}\n\n`
-        + `Change: /set <key> <value>\nKeys: ${Object.keys(EDITABLE_SETTINGS).join(', ')}`,
+        + `Change: /set <key> <value>\nKeys: ${EDITABLE_SETTING_KEYS.join(', ')}\n`
+        + 'You can also change them in the Mini App: Dashboard → Settings.',
     );
   });
 
   bot.command('set', async (ctx) => {
     if (!ctx.from || !isAdmin(ctx.from.id) || ctx.chat.type !== 'private') return;
     const [key, value] = ctx.match.trim().split(/\s+/, 2);
-    const validate = key ? EDITABLE_SETTINGS[key] : undefined;
-    if (!validate || value === undefined || !validate(value)) {
-      await ctx.reply(`Usage: /set <key> <value>\nKeys: ${Object.keys(EDITABLE_SETTINGS).join(', ')}`);
+    const known = (EDITABLE_SETTING_KEYS as string[]).includes(key ?? '');
+    if (!known || value === undefined || !/^\d+$/.test(value)) {
+      await ctx.reply(`Usage: /set <key> <value>\nKeys: ${EDITABLE_SETTING_KEYS.join(', ')}`);
       return;
     }
-    await writeSetting(key, value);
-    await ctx.reply(`${key} = ${value}`);
+    const { min, max } = EDITABLE_SETTING_LIMITS[key as EditableSettingKey];
+    if (Number(value) < min || Number(value) > max) {
+      await ctx.reply(`${key} must be a whole number from ${min} to ${max}`);
+      return;
+    }
+    const settings = updateSettings({ [key]: Number(value) }, ctx.from.first_name || String(ctx.from.id));
+    await ctx.reply(`${key} = ${settings[key as EditableSettingKey]}`);
   });
 
   bot.callbackQuery(/^approve:(.+)$/, async (ctx) => {

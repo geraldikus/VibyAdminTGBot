@@ -38,8 +38,10 @@ export async function getStudent(studentId: string): Promise<Student> {
 }
 
 const insertStudentStmt = db.prepare(
-  `INSERT INTO students (student_id, name, contact, teacher_id, teacher_name, type, status, balance, notes, active, created_at, updated_at)
-   VALUES (@student_id, @name, @contact, @teacher_id, @teacher_name, @type, @status, @balance, @notes, 1, @created_at, @updated_at)`,
+  `INSERT INTO students (student_id, name, contact, teacher_id, teacher_name, type, status, balance, notes, active, created_at, updated_at,
+     payment_wait_since, payment_reminded_at)
+   VALUES (@student_id, @name, @contact, @teacher_id, @teacher_name, @type, @status, @balance, @notes, 1, @created_at, @updated_at,
+     @payment_wait_since, @payment_reminded_at)`,
 );
 
 export async function createStudent(input: CreateStudentInput, by: string): Promise<Student> {
@@ -60,6 +62,8 @@ export async function createStudent(input: CreateStudentInput, by: string): Prom
       active: true,
       created_at: now,
       updated_at: now,
+      payment_wait_since: input.status === 'yellow' ? now : '',
+      payment_reminded_at: '',
     };
     const { active: _active, ...columns } = student;
     insertStudentStmt.run(columns);

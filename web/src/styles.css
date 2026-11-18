@@ -156,6 +156,10 @@ select {
 }
 textarea { min-height: 76px; resize: vertical; }
 input::placeholder, textarea::placeholder { color: var(--hint); }
+.setting-value { display: inline-flex; align-items: center; gap: 6px; }
+.setting-value input { width: 64px; padding: 7px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.setting-value input.invalid { box-shadow: 0 0 0 2px color-mix(in srgb, var(--destructive) 55%, transparent); }
+.setting-unit { color: var(--hint); font-size: 15px; min-width: 32px; }
 label { font-size: 13px; color: var(--hint); display: block; margin: 14px 0 6px; }
 .form-fields > label:first-child { margin-top: 0; }
 

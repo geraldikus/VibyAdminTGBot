@@ -48,10 +48,11 @@ function webAppKeyboard() {
   return new InlineKeyboard().webApp('Open Mini App', config.webappUrl);
 }
 
-export async function notifyAdmins(text: string, extra?: { studentId?: string }) {
+export async function notifyAdmins(text: string, extra?: { studentId?: string; path?: string; button?: string }) {
   if (!api) return;
-  const keyboard = extra?.studentId
-    ? new InlineKeyboard().webApp('Open Mini App', `${config.webappUrl}/admin/students/${extra.studentId}`)
+  const path = extra?.studentId ? `/admin/students/${extra.studentId}` : extra?.path;
+  const keyboard = path
+    ? new InlineKeyboard().webApp(extra?.button ?? 'Open Mini App', `${config.webappUrl}${path}`)
     : webAppKeyboard();
   for (const adminId of config.adminIds) {
     try {

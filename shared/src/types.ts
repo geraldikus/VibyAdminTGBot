@@ -43,6 +43,10 @@ export interface Student {
   active: boolean;
   created_at: string;
   updated_at: string;
+  /** When the status became "Waiting for payment" (set by a DB trigger), '' otherwise. */
+  payment_wait_since: string;
+  /** Last "check the payment" reminder sent to admins, '' if none since the status changed. */
+  payment_reminded_at: string;
 }
 
 export interface Lesson {
@@ -107,6 +111,7 @@ export interface AppSettings {
   edit_window_min: number;
   photo_reminder_min: number;
   photo_admin_alert_min: number;
+  payment_reminder_days: number;
   timezone: string;
   last_business_report: string;
 }
@@ -116,6 +121,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   edit_window_min: 5,
   photo_reminder_min: 10,
   photo_admin_alert_min: 60,
+  payment_reminder_days: 2,
   timezone: 'Europe/Moscow',
   last_business_report: '',
 };
@@ -180,6 +186,30 @@ export const updateTeacherSchema = z.object({
 export const businessReportSchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 });
+
+/** Settings an admin can change (Mini App and /set), with their allowed ranges. */
+export const EDITABLE_SETTING_LIMITS = {
+  backdate_days: { min: 0, max: 365 },
+  edit_window_min: { min: 0, max: 1440 },
+  photo_reminder_min: { min: 1, max: 1440 },
+  photo_admin_alert_min: { min: 1, max: 10080 },
+  payment_reminder_days: { min: 0, max: 365 },
+} as const;
+
+export type EditableSettingKey = keyof typeof EDITABLE_SETTING_LIMITS;
+
+const settingInt = (key: EditableSettingKey) =>
+  z.coerce.number().int().min(EDITABLE_SETTING_LIMITS[key].min).max(EDITABLE_SETTING_LIMITS[key].max);
+
+export const updateSettingsSchema = z.object({
+  backdate_days: settingInt('backdate_days').optional(),
+  edit_window_min: settingInt('edit_window_min').optional(),
+  photo_reminder_min: settingInt('photo_reminder_min').optional(),
+  photo_admin_alert_min: settingInt('photo_admin_alert_min').optional(),
+  payment_reminder_days: settingInt('payment_reminder_days').optional(),
+}).strict();
+
+export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 export type EditLessonInput = z.infer<typeof editLessonSchema>;
